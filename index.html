@@ -304,7 +304,8 @@ function defaultTeam(){
     halfMin: 25,
     groups: [
       { id: "g-voor", name: "Voorhoede", spots: ["Voor", "Midden", "Voor"], blocks: "auto" },
-      { id: "g-achter", name: "Achterhoede", spots: ["Achter", "Achter"], blocks: "auto" }
+      { id: "g-achter", name: "Achterhoede", spots: ["Achter", "Achter"], blocks: "auto" },
+      { id: "g-keeper", name: "Keeper", spots: ["Keeper"], blocks: 1 }
     ],
     // array order within a line is the rotation order: number 1 goes to the bench first
     players: [
@@ -314,7 +315,8 @@ function defaultTeam(){
       { id: "p-4", name: "Speelster 4", group: "g-voor", pref: "Voor", present: true },
       { id: "p-5", name: "Speelster 5", group: "g-achter", pref: "", present: true },
       { id: "p-6", name: "Speelster 6", group: "g-achter", pref: "", present: true },
-      { id: "p-7", name: "Speelster 7", group: "g-achter", pref: "", present: true }
+      { id: "p-7", name: "Speelster 7", group: "g-achter", pref: "", present: true },
+      { id: "p-8", name: "Speelster 8", group: "g-keeper", pref: "", present: true }
     ]
   };
 }
@@ -323,6 +325,12 @@ const freshMatch = () => ({ acc: 0, runStart: null, runFrom: 0, halfAt: null, ac
 
 let S = load("team", null);
 if (!S || !Array.isArray(S.groups) || !Array.isArray(S.players) || !S.groups.length) S = defaultTeam();
+// teams saved before the keeper existed get an empty keeper line once
+if (!S.keeperAdded){
+  if (!S.groups.some(g => g.id === "g-keeper" || /keep/i.test(g.name))) S.groups.push({ id: "g-keeper", name: "Keeper", spots: ["Keeper"], blocks: 1 });
+  S.keeperAdded = true;
+  store("team", S);
+}
 let M = Object.assign(freshMatch(), load("match", {}));
 let UI = Object.assign({ tab: "live", sound: true }, load("ui", {}));
 let armed = { key: null, at: 0 };
@@ -446,7 +454,8 @@ function groupSummary(G){
   const H = S.halfMin * 60;
   if (G.P === 0) return { cls: "warn", text: "Nog geen speelsters in deze linie." };
   if (G.P < G.S) return { cls: "warn", text: `${G.P} speelster${G.P === 1 ? "" : "s"} voor ${G.S} plekken. Zet iemand uit een andere linie hierheen of haal een positie weg.` };
-  if (G.b === 0) return { cls: "", text: `${G.P} speelsters voor ${G.S} plekken: iedereen speelt de hele wedstrijd.` };
+  if (G.b === 0) return { cls: "", text: G.P === 1 ? "Speelt de hele wedstrijd." : `${G.P} speelsters voor ${G.S} plekken: iedereen speelt de hele wedstrijd.` };
+  if (G.S === 1 && G.P === 2 && G.n === 1) return { cls: "ok", text: "Ieder één helft, wissel in de rust." };
   const base = `${G.P} speelsters voor ${G.S} plekken · elke ${durFmt(H / G.n)} min een wissel`;
   if ((2 * G.n * G.b) % G.P === 0){
     const bench = (2 * G.n * G.b / G.P) * (H / G.n);
