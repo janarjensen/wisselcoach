@@ -230,7 +230,7 @@ button{cursor:pointer}
 .fLabel{font-size:12px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:var(--muted)}
 .spots{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .spot{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);overflow:hidden}
-.spot input{border:0;background:transparent;padding:6px 4px 6px 9px;font-weight:700;min-width:0}
+.spot select{border:0;background:transparent;padding:6px 4px 6px 9px;font-weight:700;min-width:0}
 .spot button{border:0;background:transparent;color:var(--muted);padding:6px 9px;font-size:16px;line-height:1}
 .btnSmall{border:1px dashed var(--line);background:transparent;border-radius:8px;padding:6px 10px;font-weight:700;color:var(--muted)}
 .blocksRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -303,16 +303,16 @@ function defaultTeam(){
   return {
     halfMin: 25,
     groups: [
-      { id: "g-voor", name: "Voorhoede", spots: ["Voor", "Midden", "Voor"], blocks: "auto" },
-      { id: "g-achter", name: "Achterhoede", spots: ["Achter", "Achter"], blocks: "auto" },
+      { id: "g-voor", name: "Voorhoede", spots: ["Links", "Midden", "Rechts"], blocks: "auto" },
+      { id: "g-achter", name: "Achterhoede", spots: ["Links", "Rechts"], blocks: "auto" },
       { id: "g-keeper", name: "Keeper", spots: ["Keeper"], blocks: 1 }
     ],
     // array order within a line is the rotation order: number 1 goes to the bench first
     players: [
       { id: "p-1", name: "Speelster 1", group: "g-voor", pref: "", present: true },
-      { id: "p-2", name: "Speelster 2", group: "g-voor", pref: "Voor", present: true },
+      { id: "p-2", name: "Speelster 2", group: "g-voor", pref: "Links", present: true },
       { id: "p-3", name: "Speelster 3", group: "g-voor", pref: "Midden", present: true },
-      { id: "p-4", name: "Speelster 4", group: "g-voor", pref: "Voor", present: true },
+      { id: "p-4", name: "Speelster 4", group: "g-voor", pref: "Rechts", present: true },
       { id: "p-5", name: "Speelster 5", group: "g-achter", pref: "", present: true },
       { id: "p-6", name: "Speelster 6", group: "g-achter", pref: "", present: true },
       { id: "p-7", name: "Speelster 7", group: "g-achter", pref: "", present: true },
@@ -329,6 +329,23 @@ if (!S || !Array.isArray(S.groups) || !Array.isArray(S.players) || !S.groups.len
 if (!S.keeperAdded){
   if (!S.groups.some(g => g.id === "g-keeper" || /keep/i.test(g.name))) S.groups.push({ id: "g-keeper", name: "Keeper", spots: ["Keeper"], blocks: 1 });
   S.keeperAdded = true;
+  store("team", S);
+}
+// teams saved with "Voor/Achter" spots move to left / middle / right once
+if (!S.sidesAdded){
+  S.groups.forEach(g => {
+    const old = [...new Set(g.spots.filter(s => s === "Voor" || s === "Achter"))];
+    old.forEach(name => {
+      const count = g.spots.filter(s => s === name).length;
+      const sides = count === 1 ? ["Midden"] : count === 2 ? ["Links", "Rechts"] : null;
+      if (!sides) return;
+      let k = 0;
+      g.spots = g.spots.map(s => s === name ? sides[k++] : s);
+      k = 0;
+      S.players.forEach(p => { if (p.group === g.id && p.pref === name) p.pref = sides[Math.min(k++, sides.length - 1)]; });
+    });
+  });
+  S.sidesAdded = true;
   store("team", S);
 }
 let M = Object.assign(freshMatch(), load("match", {}));
@@ -446,6 +463,10 @@ function buildPlan(){
 let plan = buildPlan();
 
 const multiSpot = G => new Set(G.g.spots).size > 1;
+const SPOT_CHOICES = ["Links", "Midden", "Rechts", "Keeper"];
+// slot indices in pitch order: left, middle, right, then anything else
+const SIDE_RANK = { Links: 0, Midden: 1, Rechts: 2 };
+const sideOrder = spots => spots.map((s, i) => i).sort((a, b) => (SIDE_RANK[spots[a]] ?? 3) - (SIDE_RANK[spots[b]] ?? 3) || a - b);
 function blockAt(G, t){
   for (const B of G.blocks) if (t >= B.start && t < B.end) return B;
   return G.blocks[G.blocks.length - 1];
@@ -643,7 +664,8 @@ function renderLive(force){
 
     const bands = plan.groups.map(G => {
       const B = blockAt(G, st.lt);
-      const chips = B.slots.map((p, i) => {
+      const chips = sideOrder(G.g.spots).map(i => {
+        const p = B.slots[i];
         if (!p) return `<div class="pChip empty"><b>open</b><small>${esc(G.g.spots[i])}</small></div>`;
         const goes = G.blocks.find(X => X.start > st.lt && !X.slots.includes(p));
         const wait = goes ? `<span class="pWait">eruit over <span class="cd" data-at="${goes.start}">${cdText(goes.start, st.e)}</span></span>` : `<span class="pWait">speelt uit</span>`;
@@ -910,7 +932,7 @@ function renderTeam(){
     html += `<div class="card">
       <input class="gcName" id="gname-${esc(g.id)}" data-field="gname" data-gid="${esc(g.id)}" value="${esc(g.name)}" aria-label="Naam linie">
       <div class="field"><span class="fLabel">Posities in het veld</span>
-        <div class="spots">${g.spots.map((s, i) => `<span class="spot"><input id="spot-${esc(g.id)}-${i}" data-field="spot" data-gid="${esc(g.id)}" data-idx="${i}" value="${esc(s)}" size="${Math.max(4, s.length)}" aria-label="Positie ${i + 1}">${g.spots.length > 1 ? `<button data-action="spot-del" data-gid="${esc(g.id)}" data-idx="${i}" aria-label="Verwijder positie ${esc(s)}">×</button>` : ""}</span>`).join("")}
+        <div class="spots">${g.spots.map((s, i) => `<span class="spot"><select id="spot-${esc(g.id)}-${i}" data-field="spot" data-gid="${esc(g.id)}" data-idx="${i}" aria-label="Positie ${i + 1}">${(SPOT_CHOICES.includes(s) ? SPOT_CHOICES : [s, ...SPOT_CHOICES]).map(o => `<option${o === s ? " selected" : ""}>${esc(o)}</option>`).join("")}</select>${g.spots.length > 1 ? `<button data-action="spot-del" data-gid="${esc(g.id)}" data-idx="${i}" aria-label="Verwijder positie ${esc(s)}">×</button>` : ""}</span>`).join("")}
           <button class="btnSmall" data-action="spot-add" data-gid="${esc(g.id)}">+ positie</button>
         </div>
       </div>
@@ -957,7 +979,7 @@ $("#tab-team").addEventListener("click", ev => {
     case "blocks-dec": { const G = plan.groups.find(x => x.g === g); g.blocks = Math.max(1, G.n - 1); break; }
     case "blocks-inc": { const G = plan.groups.find(x => x.g === g); g.blocks = Math.min(12, G.n + 1); break; }
     case "blocks-auto": g.blocks = "auto"; break;
-    case "spot-add": g.spots.push(g.spots[g.spots.length - 1] || "Positie"); break;
+    case "spot-add": g.spots.push(["Links", "Midden", "Rechts"].find(s => !g.spots.includes(s)) || "Midden"); break;
     case "spot-del": if (g.spots.length > 1) g.spots.splice(+b.dataset.idx, 1); break;
     case "player-add": addPlayer(g.id); return;
     case "up": case "down": {
@@ -971,7 +993,7 @@ $("#tab-team").addEventListener("click", ev => {
     case "del":
       if (!isArmed("del:" + pid)){ arm("del:" + pid); renderTeam(); return; }
       S.players = S.players.filter(p => p.id !== pid); disarm(); break;
-    case "group-add": S.groups.push({ id: uid("g-"), name: "Nieuwe linie", spots: ["Positie"], blocks: "auto" }); break;
+    case "group-add": S.groups.push({ id: uid("g-"), name: "Nieuwe linie", spots: ["Midden"], blocks: "auto" }); break;
     case "group-del": {
       if (!isArmed("gdel:" + g.id)){ arm("gdel:" + g.id); renderTeam(); return; }
       const other = S.groups.find(x => x !== g);
