@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1b2b">
+<title>Wisselcoach MO9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&family=Saira+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: phone-first single column; dark scoreboard on top, blue turf pitch in the middle, bottom tab bar for thumbs */
+:root{
+  --bg:#ecf1f6; --surface:#ffffff; --surface-2:#f4f7fa; --ink:#0e1b2b; --muted:#56667a; --line:#d4dde7;
+  --board:#0e1b2b; --board-ink:#e9f0f8; --board-sub:#8ea2ba;
+  --turf:#1f62b3; --turf-2:#1b59a3; --turf-edge:#164a88; --turf-line:rgba(255,255,255,.6);
+  --chip-bg:#ffffff; --chip-ink:#0e1b2b; --chip-sub:#56667a;
+  --ball:#f4c630; --ball-ink:#2b2204; --ball-soft:#fdf3cf;
+  --alert:#d7412a; --alert-ink:#ffffff; --alert-soft:#fbe3de;
+  --ok:#1b8455; --ok-ink:#ffffff; --ok-soft:#dcf2e7;
+  --g0:#f4c630; --g1:#7db0ea; --g2:#62c496; --g3:#f29a7c; --g-ink:#0e1b2b;
+  --hatch:#c3cedb;
+  --font-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"Nunito Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b131e; --surface:#131e2c; --surface-2:#182536; --ink:#e6edf6; --muted:#97a8bc; --line:#26374c;
+    --board:#060c14; --board-ink:#eef3f9; --board-sub:#8196ae;
+    --turf:#1a518f; --turf-2:#174983; --turf-edge:#123b6b; --turf-line:rgba(255,255,255,.5);
+    --chip-bg:#f3f6fa; --chip-ink:#0e1b2b; --chip-sub:#56677b;
+    --ball:#f5cb45; --ball-ink:#2b2204; --ball-soft:#3a3212;
+    --alert:#e5533b; --alert-ink:#ffffff; --alert-soft:#41201a;
+    --ok:#46c58b; --ok-ink:#06231a; --ok-soft:#133226;
+    --hatch:#2f4056;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b131e; --surface:#131e2c; --surface-2:#182536; --ink:#e6edf6; --muted:#97a8bc; --line:#26374c;
+  --board:#060c14; --board-ink:#eef3f9; --board-sub:#8196ae;
+  --turf:#1a518f; --turf-2:#174983; --turf-edge:#123b6b; --turf-line:rgba(255,255,255,.5);
+  --chip-bg:#f3f6fa; --chip-ink:#0e1b2b; --chip-sub:#56677b;
+  --ball:#f5cb45; --ball-ink:#2b2204; --ball-soft:#3a3212;
+  --alert:#e5533b; --alert-ink:#ffffff; --alert-soft:#41201a;
+  --ok:#46c58b; --ok-ink:#06231a; --ok-soft:#133226;
+  --hatch:#2f4056;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--ball);outline-offset:2px}
+.app{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:0 calc(92px + env(safe-area-inset-bottom,0px))}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brandText{min-width:0}
+.ball{width:30px;height:30px;border-radius:50%;flex:none;background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.7) 0 3px,transparent 4px),radial-gradient(circle at 62% 60%,rgba(0,0,0,.14) 0 2px,transparent 3px),radial-gradient(circle at 40% 70%,rgba(0,0,0,.12) 0 2px,transparent 3px),var(--ball);box-shadow:inset -3px -4px 0 rgba(0,0,0,.12)}
+.brand h1{margin:0;font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:.01em;line-height:1}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconBtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700;flex:none}
+.iconBtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconBtn[aria-pressed="false"]{color:var(--muted)}
+
+/* tab bar */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbarIn{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.tabbar button{background:none;border:0;padding:9px 4px 11px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--muted)}
+.tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button[aria-current="page"]{color:var(--ink)}
+.tabbar button[aria-current="page"] svg{stroke:var(--turf)}
+.tab{display:flex;flex-direction:column;gap:16px}
+
+/* scoreboard */
+.board{background:var(--board);color:var(--board-ink);border-radius:var(--r);padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.boardTop{display:flex;justify-content:space-between;align-items:center;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--board-sub);font-variant-numeric:tabular-nums}
+.phase{color:var(--ball)}
+.clock{font-family:var(--font-display);font-weight:600;font-size:clamp(64px,22vw,104px);line-height:.9;letter-spacing:.02em;font-variant-numeric:tabular-nums;text-align:center}
+.track{position:relative;height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden}
+.trackFill{position:absolute;left:0;top:0;bottom:0;background:var(--ball);border-radius:6px}
+.track i{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--board-ink);opacity:.75}
+.track i.done{opacity:.25}
+.trackHalf{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:var(--board-sub)}
+.trackLabels{display:flex;justify-content:space-between;font-size:11px;color:var(--board-sub);font-variant-numeric:tabular-nums;margin-top:-4px}
+.controls{display:flex;gap:8px}
+.btnMain{flex:1;border:0;border-radius:10px;background:var(--ball);color:var(--ball-ink);font-weight:800;font-size:17px;padding:13px 12px}
+.btnGhost{border:1px solid rgba(255,255,255,.22);background:transparent;color:var(--board-ink);border-radius:10px;padding:0 12px;font-weight:700;font-variant-numeric:tabular-nums}
+.restNote{margin:0;font-size:13px;color:var(--board-sub);text-align:center}
+
+/* next change */
+.next{border-radius:var(--r);padding:14px 16px;background:var(--surface);border:2px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.next.soon{background:var(--ball-soft);border-color:var(--ball)}
+.next.due{background:var(--alert);border-color:var(--alert);color:var(--alert-ink);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--alert) 30%,transparent)}}
+.nextTop{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--muted)}
+.next.due .eyebrow{color:var(--alert-ink);opacity:.85}
+.countdown{font-family:var(--font-display);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.changes{display:flex;flex-direction:column;gap:10px}
+.change{display:flex;flex-direction:column;gap:4px}
+.chGroup{font-weight:800;font-size:13px}
+.chLine{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:18px;font-weight:700}
+.chLine small{font-weight:600;font-size:13px;opacity:.75}
+.lbl{display:inline-block;min-width:58px;text-align:center;font-size:11px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;border-radius:6px;padding:3px 6px}
+.lbl.out{background:var(--alert-soft);color:var(--alert)}
+.lbl.in{background:var(--ok-soft);color:var(--ok)}
+.lbl.move{background:var(--surface-2);color:var(--muted)}
+.next.due .lbl{background:rgba(255,255,255,.2);color:var(--alert-ink)}
+.btnAck{align-self:flex-start;border:0;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:800;padding:11px 18px;font-size:15px}
+.next.due .btnAck{background:var(--alert-ink);color:var(--alert)}
+.nextEmpty{color:var(--muted);margin:0}
+
+/* pitch */
+.secTitle{margin:4px 0 -6px;font-family:var(--font-display);font-weight:700;font-size:20px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.secTitle span{font-family:var(--font-body);font-size:13px;font-weight:600;color:var(--muted)}
+.pitch{position:relative;border-radius:var(--r);border:3px solid var(--turf-edge);background:repeating-linear-gradient(180deg,var(--turf) 0 40px,var(--turf-2) 40px 80px);padding:34px 12px;display:flex;flex-direction:column;gap:26px;overflow:hidden}
+.pitch::before{content:"";position:absolute;inset:8px;border:2px solid var(--turf-line);border-radius:3px;pointer-events:none}
+.circ{position:absolute;left:50%;width:56%;height:44px;transform:translateX(-50%);border:2px solid var(--turf-line);pointer-events:none}
+.circ.top{top:8px;border-top:0;border-radius:0 0 999px 999px}
+.circ.bot{bottom:8px;border-bottom:0;border-radius:999px 999px 0 0}
+.band{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:7px}
+.bandLabel{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:rgba(255,255,255,.78)}
+.bandRow{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.pChip{position:relative;border:0;background:var(--chip-bg);color:var(--chip-ink);border-radius:10px;padding:6px 10px 7px;min-width:88px;text-align:center;box-shadow:0 2px 0 rgba(0,0,0,.2)}
+.pChip b{display:block;font-weight:800;font-size:16px;line-height:1.2}
+.pChip small{display:block;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;color:var(--chip-sub)}
+.pChip .pWait{display:block;margin-top:2px;font-size:11.5px;font-weight:700;color:var(--chip-sub);font-variant-numeric:tabular-nums}
+.pChip.empty{background:transparent;color:rgba(255,255,255,.85);border:2px dashed rgba(255,255,255,.6);box-shadow:none}
+.pChip.empty small{color:rgba(255,255,255,.7)}
+.pChip.out{outline:3px solid var(--alert);outline-offset:1px}
+.pChip.sel,.bChip.sel{outline:3px solid var(--ball);outline-offset:1px}
+.tag{position:absolute;top:-9px;right:-6px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;padding:1px 6px}
+.tag.out{background:var(--alert);color:var(--alert-ink)}
+.tag.in{background:var(--ok);color:var(--ok-ink)}
+.tapHint{margin:-8px 0 0;font-size:12.5px;color:var(--muted)}
+
+/* player sheet (injury) */
+.sheet{background:var(--surface);border:2px solid var(--ball);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.sheetHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sheetHead strong{font-family:var(--font-display);font-size:22px}
+.sheet p{margin:0;color:var(--muted);max-width:60ch}
+.sheetBtns{display:flex;gap:8px;flex-wrap:wrap}
+.btnDanger{border:0;border-radius:10px;background:var(--alert);color:var(--alert-ink);font-weight:800;padding:11px 18px}
+.btnOk{border:0;border-radius:10px;background:var(--ok);color:var(--ok-ink);font-weight:800;padding:11px 18px}
+
+/* bench */
+.bench{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.benchHead{display:flex;justify-content:space-between;align-items:baseline}
+.benchHead strong{font-family:var(--font-display);font-size:18px}
+.benchHead span{font-size:13px;color:var(--muted)}
+.benchRow{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.bChip{position:relative;text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:8px 12px 9px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.bChip b{font-weight:800;font-size:16px}
+.bChip small{font-size:12px;color:var(--muted)}
+.bWait{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.bWait span{font-size:12px;font-weight:700;color:var(--muted)}
+.bWait strong{font-family:var(--font-display);font-weight:700;font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.bChip.in{border:2px solid var(--ok);background:var(--ok-soft)}
+.bChip.inj{border-style:dashed}
+.bChip.inj b{color:var(--muted)}
+.injTag{font-size:12px;font-weight:800;color:var(--alert);margin-top:4px}
+.muted{color:var(--muted)}
+
+/* event lists */
+.later{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.later h3,.card h2,.card h3{margin:0 0 8px;font-family:var(--font-display);font-weight:700;font-size:18px}
+.evList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.evList li{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;padding:7px 0;border-top:1px solid var(--line);align-items:baseline}
+.evList li:first-child{border-top:0}
+.evList li.done{opacity:.45}
+.tpill{font-family:var(--font-display);font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.evText{min-width:0;font-size:14px}
+.evText b{font-weight:800}
+.evWait{font-size:13px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.resetRow{display:flex;justify-content:center}
+.btnText{background:none;border:0;color:var(--muted);font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:8px}
+.btnText.danger,.btnText.armed{color:var(--alert)}
+
+/* plan */
+.planHead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-top:4px}
+.planHead h2{margin:0;font-family:var(--font-display);font-size:26px;font-weight:700}
+.lead{margin:-8px 0 0;color:var(--muted);max-width:60ch}
+.btnSecondary{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:800}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.ganttWrap{overflow-x:auto}
+.gantt{min-width:320px;display:flex;flex-direction:column;gap:6px}
+.gRow,.gHead{display:grid;grid-template-columns:70px minmax(0,1fr) 46px;gap:10px;align-items:center}
+.gName{font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gTot{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;font-size:14px}
+.gHead .gTot{font-size:11px;color:var(--muted);font-weight:700}
+.gAxis{position:relative;height:16px;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gAxis span{position:absolute;transform:translateX(-50%)}
+.gAxis span:first-child{transform:none}
+.gAxis span:last-child{transform:translateX(-100%)}
+.gBar{position:relative;height:28px;border-radius:6px;background:var(--surface-2);overflow:hidden}
+.seg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-right:1px solid var(--surface)}
+.seg em{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--g-ink);white-space:nowrap;overflow:hidden;padding:0 3px}
+.seg.g0{background:var(--g0)} .seg.g1{background:var(--g1)} .seg.g2{background:var(--g2)} .seg.g3{background:var(--g3)}
+.seg.off{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 7px)}
+.seg.inj{background:var(--alert-soft)}
+.seg.inj em{color:var(--alert)}
+.gHalf{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ink);opacity:.55}
+.gGroup{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:10px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.gGroup strong{font-family:var(--font-display);font-size:17px}
+.gGroup span{font-size:12.5px;color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:18px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:5px}
+.legend .lOn{background:var(--g0)}
+.legend .lOff{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 7px);border:1px solid var(--line)}
+.legend .lInj{background:var(--alert-soft);border:1px solid var(--alert)}
+.halfHead{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--muted);margin:12px 0 2px}
+.halfHead:first-of-type{margin-top:0}
+.copyBox{width:100%;min-height:220px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:10px;font-size:13px}
+.absent{font-size:13px;color:var(--muted);margin:10px 0 0}
+
+/* team */
+.stepRow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.stepper button{border:0;background:transparent;width:40px;height:38px;font-size:20px;font-weight:700}
+.stepper output{min-width:64px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
+.gcName{width:100%;border:0;border-bottom:2px solid var(--line);background:transparent;font-family:var(--font-display);font-weight:700;font-size:22px;padding:2px 0 4px;margin-bottom:10px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.fLabel{font-size:12px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:var(--muted)}
+.spots{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.spot{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);overflow:hidden}
+.spot input{border:0;background:transparent;padding:6px 4px 6px 9px;font-weight:700;min-width:0}
+.spot button{border:0;background:transparent;color:var(--muted);padding:6px 9px;font-size:16px;line-height:1}
+.btnSmall{border:1px dashed var(--line);background:transparent;border-radius:8px;padding:6px 10px;font-weight:700;color:var(--muted)}
+.blocksRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gcSummary{margin:0 0 14px;font-size:13.5px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.gcSummary.ok{background:var(--ok-soft)}
+.gcSummary.warn{background:var(--alert-soft)}
+.roster{list-style:none;margin:6px 0 10px;padding:0;display:flex;flex-direction:column}
+.rRow{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.rRow:first-child{border-top:0}
+.rNum{font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.rName{border:1px solid transparent;border-radius:8px;background:transparent;font-weight:800;font-size:16px;padding:5px 6px;min-width:0;width:100%}
+.rName:hover,.rName:focus{border-color:var(--line);background:var(--surface-2)}
+.rRow.absentRow .rName{color:var(--muted);text-decoration:line-through}
+.switch{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--ok)}
+.rMeta{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rMeta select{border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:5px 6px;font-size:13px;max-width:100%}
+.rBtns{display:inline-flex;gap:4px;margin-left:auto}
+.rBtns button{border:1px solid var(--line);background:var(--surface);border-radius:8px;min-width:34px;height:32px;font-weight:800}
+.rBtns button.armed{background:var(--alert);border-color:var(--alert);color:var(--alert-ink);padding:0 8px}
+.addRow{display:flex;gap:8px}
+.addRow input{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:9px 10px}
+.addRow button{border:0;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:800;padding:0 14px}
+.teamFoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.note{font-size:13px;color:var(--muted);margin:0}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:14px}
+.steps b{color:var(--ink)}
+
+@media (prefers-reduced-motion: reduce){.next.due{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="ball" aria-hidden="true"></span>
+      <div class="brandText">
+        <h1>Wisselcoach</h1>
+        <p id="teamLine">MO9</p>
+      </div>
+    </div>
+    <button id="soundBtn" class="iconBtn" aria-pressed="true"></button>
+  </header>
+  <main>
+    <section id="tab-team" class="tab" aria-label="Invullen" hidden></section>
+    <section id="tab-live" class="tab" aria-label="Wedstrijd"></section>
+    <section id="tab-plan" class="tab" aria-label="Schema" hidden></section>
+  </main>
+</div>
+<nav class="tabbar" aria-label="Onderdelen">
+  <div class="tabbarIn">
+    <button data-tab="team"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>Invullen</button>
+    <button data-tab="live"><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M12 2.5V6M18.5 6.5l1.5-1.5"/></svg>Wedstrijd</button>
+    <button data-tab="plan"><svg viewBox="0 0 24 24"><path d="M4 6h9M9 12h11M4 18h7M4 3v18"/></svg>Schema</button>
+  </div>
+</nav>
+
+<script>
+(function(){
+"use strict";
+const KEY = "wisselcoach-mo9-v1";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2, "0");
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function load(k, d){ try { const v = localStorage.getItem(KEY + ":" + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } }
+function store(k, v){ try { localStorage.setItem(KEY + ":" + k, JSON.stringify(v)); } catch(e){} }
+
+function defaultTeam(){
+  return {
+    halfMin: 25,
+    groups: [
+      { id: "g-voor", name: "Voorhoede", spots: ["Voor", "Midden", "Voor"], blocks: "auto" },
+      { id: "g-achter", name: "Achterhoede", spots: ["Achter", "Achter"], blocks: "auto" }
+    ],
+    // array order within a line is the rotation order: number 1 goes to the bench first
+    players: [
+      { id: "p-1", name: "Speelster 1", group: "g-voor", pref: "", present: true },
+      { id: "p-2", name: "Speelster 2", group: "g-voor", pref: "Voor", present: true },
+      { id: "p-3", name: "Speelster 3", group: "g-voor", pref: "Midden", present: true },
+      { id: "p-4", name: "Speelster 4", group: "g-voor", pref: "Voor", present: true },
+      { id: "p-5", name: "Speelster 5", group: "g-achter", pref: "", present: true },
+      { id: "p-6", name: "Speelster 6", group: "g-achter", pref: "", present: true },
+      { id: "p-7", name: "Speelster 7", group: "g-achter", pref: "", present: true }
+    ]
+  };
+}
+// outs: injuries during the match, {pid, from, to|null} in match seconds
+const freshMatch = () => ({ acc: 0, runStart: null, runFrom: 0, halfAt: null, acks: [], pre: [], alarmed: [], outs: [] });
+
+let S = load("team", null);
+if (!S || !Array.isArray(S.groups) || !Array.isArray(S.players) || !S.groups.length) S = defaultTeam();
+let M = Object.assign(freshMatch(), load("match", {}));
+let UI = Object.assign({ tab: "live", sound: true }, load("ui", {}));
+let armed = { key: null, at: 0 };
+let pick = null;
+const saveTeam = () => store("team", S), saveMatch = () => store("match", M), saveUI = () => store("ui", { tab: UI.tab, sound: UI.sound });
+
+/* ---------- time formatting ---------- */
+const clockFmt = sec => { sec = Math.max(0, Math.floor(sec + 1e-6)); return pad(Math.floor(sec / 60)) + ":" + pad(sec % 60); };
+const waitFmt = sec => { sec = Math.max(0, Math.ceil(sec - 1e-6)); return Math.floor(sec / 60) + ":" + pad(sec % 60); };
+const tFmt = sec => { sec = Math.round(sec); const m = Math.floor(sec / 60), s = sec % 60; return s ? m + ":" + pad(s) : String(m); };
+const durFmt = sec => { sec = Math.round(sec); return Math.floor(sec / 60) + ":" + pad(sec % 60); };
+const joinNames = arr => arr.length <= 1 ? (arr[0] || "") : arr.slice(0, -1).join(", ") + " en " + arr[arr.length - 1];
+
+/* ---------- schedule ---------- */
+const isAvail = (pid, x) => !M.outs.some(o => o.pid === pid && x >= o.from && (o.to == null || x < o.to));
+const activeOut = pid => M.outs.find(o => o.pid === pid && o.to == null) || null;
+
+function autoBlocks(P, b, halfMin){
+  if (b <= 0 || P <= 0) return 1;
+  let best = null;
+  for (let n = 1; n <= 8; n++){
+    const len = halfMin / n, unfair = (2 * n * b) % P ? 1 : 0;
+    let pen = 0;
+    if (len > 13) pen += len - 13;
+    if (len < 4) pen += (4 - len) * 2;
+    const score = unfair * 10 + pen;
+    if (!best || score < best.score - 1e-9) best = { n, score };
+  }
+  return best.n;
+}
+function fairN(P, b){ for (let n = 1; n <= 12; n++) if ((2 * n * b) % P === 0) return n; return null; }
+
+function assignSlots(spots, onField, prev){
+  const slots = spots.map(() => null), placed = new Set();
+  const prevIdx = p => prev ? prev.indexOf(p) : -1;
+  for (const p of onField){           // 1. preferred position, same spot as before if possible
+    if (!p.pref) continue;
+    const pi = prevIdx(p);
+    if (pi >= 0 && spots[pi] === p.pref && !slots[pi]){ slots[pi] = p; placed.add(p); continue; }
+    const i = spots.findIndex((s, k) => s === p.pref && !slots[k]);
+    if (i >= 0){ slots[i] = p; placed.add(p); }
+  }
+  for (const p of onField){           // 2. stay where you were
+    if (placed.has(p)) continue;
+    const pi = prevIdx(p);
+    if (pi >= 0 && !slots[pi]){ slots[pi] = p; placed.add(p); }
+  }
+  for (const p of onField){           // 3. fill what is left
+    if (placed.has(p)) continue;
+    const i = slots.findIndex(s => !s);
+    if (i >= 0){ slots[i] = p; placed.add(p); }
+  }
+  return slots;
+}
+
+function buildPlan(){
+  const H = S.halfMin * 60, T = 2 * H;
+  const splits = [...new Set(M.outs.flatMap(o => [o.from, o.to]).filter(x => x != null && x > 0 && x < T))];
+  const groups = S.groups.map((g, gi) => {
+    const members = S.players.filter(p => p.group === g.id && p.present);
+    const Sn = g.spots.length, P = members.length, b = Math.max(0, P - Sn);
+    const n = g.blocks === "auto" ? autoBlocks(P, b, S.halfMin) : g.blocks;
+    const regular = [];
+    for (let i = 0; i < 2 * n; i++) regular.push(Math.floor(i / n) * H + Math.round((i % n) * H / n));
+    const regSet = new Set(regular);
+    const starts = [...new Set([...regular, ...splits])].sort((a, b) => a - b);
+    const order = new Map(members.map((m, i) => [m.id, i]));
+    const played = new Map(members.map(m => [m.id, 0]));
+    const blocks = [];
+    let prev = null, prevField = [];
+    starts.forEach((start, i) => {
+      const end = i + 1 < starts.length ? starts[i + 1] : T;
+      const avail = members.filter(m => isAvail(m.id, start));
+      const need = Math.min(Sn, avail.length);
+      let field;
+      if (regSet.has(start) || !prev){
+        // whoever has played most goes to the bench; on a tie the rotation order decides
+        const benchN = avail.length - need;
+        const bench = [...avail].sort((a, c) => played.get(c.id) - played.get(a.id) || order.get(a.id) - order.get(c.id)).slice(0, benchN);
+        field = avail.filter(m => !bench.includes(m));
+      } else {
+        // injury or return mid-block: keep who is on, fill gaps with whoever has played least
+        const keep = prevField.filter(m => avail.includes(m));
+        const fresh = avail.filter(m => !keep.includes(m)).sort((a, c) => played.get(a.id) - played.get(c.id) || order.get(a.id) - order.get(c.id));
+        field = keep.concat(fresh.slice(0, need - keep.length));
+      }
+      const bench = avail.filter(m => !field.includes(m));
+      const slots = assignSlots(g.spots, field, prev);
+      field.forEach(m => played.set(m.id, played.get(m.id) + end - start));
+      blocks.push({ start, end, half: start < H ? 0 : 1, bench, slots, regular: regSet.has(start) });
+      prev = slots; prevField = field;
+    });
+    return { g, gi, members, S: Sn, P, b, n, blocks, played };
+  });
+  const times = [...new Set(groups.flatMap(G => G.blocks.map(B => B.start)).filter(t => t > 0))].sort((a, b) => a - b);
+  const events = times.map(t => {
+    const changes = [];
+    for (const G of groups){
+      const bi = G.blocks.findIndex(B => B.start === t);
+      if (bi <= 0) continue;
+      const A = G.blocks[bi - 1], B = G.blocks[bi];
+      const aOn = A.slots.filter(Boolean), bOn = B.slots.filter(Boolean);
+      const out = aOn.filter(p => !bOn.includes(p)).map(p => ({ p, hurt: !isAvail(p.id, t) }));
+      const inn = bOn.filter(p => !aOn.includes(p)).map(p => ({ p, spot: G.g.spots[B.slots.indexOf(p)] }));
+      const moves = bOn.filter(p => aOn.includes(p) && G.g.spots[A.slots.indexOf(p)] !== G.g.spots[B.slots.indexOf(p)])
+        .map(p => ({ p, to: G.g.spots[B.slots.indexOf(p)] }));
+      if (out.length || inn.length || moves.length) changes.push({ G, out, inn, moves });
+    }
+    return { t, changes };
+  }).filter(e => e.changes.length);
+  return { H, T, groups, events };
+}
+let plan = buildPlan();
+
+const multiSpot = G => new Set(G.g.spots).size > 1;
+function blockAt(G, t){
+  for (const B of G.blocks) if (t >= B.start && t < B.end) return B;
+  return G.blocks[G.blocks.length - 1];
+}
+function groupSummary(G){
+  const H = S.halfMin * 60;
+  if (G.P === 0) return { cls: "warn", text: "Nog geen speelsters in deze linie." };
+  if (G.P < G.S) return { cls: "warn", text: `${G.P} speelster${G.P === 1 ? "" : "s"} voor ${G.S} plekken. Zet iemand uit een andere linie hierheen of haal een positie weg.` };
+  if (G.b === 0) return { cls: "", text: `${G.P} speelsters voor ${G.S} plekken: iedereen speelt de hele wedstrijd.` };
+  const base = `${G.P} speelsters voor ${G.S} plekken · elke ${durFmt(H / G.n)} min een wissel`;
+  if ((2 * G.n * G.b) % G.P === 0){
+    const bench = (2 * G.n * G.b / G.P) * (H / G.n);
+    return { cls: "ok", text: `${base} · ieder ${durFmt(bench)} min op de bank` };
+  }
+  const f = fairN(G.P, G.b);
+  return { cls: "warn", text: `${base}. Niet iedereen zit even lang op de bank${f ? `; met ${f} wisselmomenten per helft wel` : ""}.` };
+}
+
+/* ---------- match clock ---------- */
+const running = () => M.runStart != null;
+const rawElapsed = () => M.acc + (running() ? (Date.now() - M.runStart) / 1000 : 0);
+function clampRun(){
+  if (!running()) return null;
+  const H = plan.H, T = plan.T, e = rawElapsed();
+  if (M.runFrom < H - 0.001 && e >= H){ M.acc = H; M.runStart = null; M.halfAt = Date.now(); saveMatch(); return "half"; }
+  if (e >= T){ M.acc = T; M.runStart = null; saveMatch(); return "end"; }
+  return null;
+}
+const elapsed = () => Math.min(plan.T, Math.max(0, rawElapsed()));
+const atHalf = e => !running() && Math.abs(e - plan.H) < 0.01;
+function phase(e){
+  if (e >= plan.T - 0.01) return "end";
+  if (!running() && e < 0.01) return "start";
+  if (atHalf(e)) return "half";
+  const h = e < plan.H ? "1" : "2";
+  return (running() ? "run" : "pause") + h;
+}
+const PHASE_LABEL = { start: "Klaar voor de start", run1: "1e helft", pause1: "1e helft · klok stil", half: "Rust", run2: "2e helft", pause2: "2e helft · klok stil", end: "Einde wedstrijd" };
+function phaseText(ph){
+  if (ph === "half" && M.halfAt) return "Rust · " + clockFmt((Date.now() - M.halfAt) / 1000);
+  return PHASE_LABEL[ph];
+}
+
+function startClock(){
+  ensureAudio(); askNotify();
+  M.runFrom = M.acc; M.runStart = Date.now(); M.halfAt = null;
+  keepAwake(); saveMatch();
+}
+function pauseClock(){ M.acc = rawElapsed(); M.runStart = null; saveMatch(); }
+function adjust(d){
+  const e = Math.min(plan.T, Math.max(0, rawElapsed() + d));
+  M.acc = e;
+  if (running()){ M.runStart = Date.now(); M.runFrom = e; }
+  saveMatch();
+}
+
+/* ---------- sound, vibration, notifications, screen ---------- */
+let actx = null;
+function ensureAudio(){
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+  } catch(e){}
+}
+function tone(freq, at, dur, vol){
+  if (!actx || !UI.sound) return;
+  try {
+    const o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + at;
+    o.type = "triangle"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  } catch(e){}
+}
+const vibrate = p => { try { navigator.vibrate && navigator.vibrate(p); } catch(e){} };
+function askNotify(){
+  try { if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {}); } catch(e){}
+}
+function notify(title, body){
+  try {
+    if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body, tag: "wisselcoach", renotify: true });
+  } catch(e){}
+}
+function eventPlain(ev){
+  return ev.changes.map(c => {
+    const parts = [];
+    if (c.out.length) parts.push(joinNames(c.out.map(x => x.p.name)) + " eruit");
+    if (c.inn.length) parts.push(joinNames(c.inn.map(x => x.p.name)) + " erin");
+    return parts.join(", ");
+  }).join(" · ");
+}
+function alarm(ev){ tone(1175, 0, .25, .5); tone(1175, .35, .25, .5); tone(1568, .7, .5, .5); vibrate([300, 120, 300, 120, 400]); notify("Wissel nu!", eventPlain(ev)); }
+function preAlarm(ev){ tone(880, 0, .18, .35); vibrate(150); if (ev) notify("Over 30 seconden wisselen", eventPlain(ev)); }
+function whistle(kind){ tone(1500, 0, .3, .4); tone(1500, .4, .9, .4); vibrate([500, 150, 800]); notify(kind === "half" ? "Rust" : "Einde wedstrijd", kind === "half" ? "De klok staat stil tot je de 2e helft start." : "Goed gespeeld!"); }
+let wakeLock = null;
+async function keepAwake(){
+  try {
+    if ("wakeLock" in navigator && document.visibilityState === "visible" && !wakeLock){
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    }
+  } catch(e){}
+}
+document.addEventListener("visibilitychange", () => { if (running()) keepAwake(); tick(); });
+
+/* ---------- live view ---------- */
+function liveState(){
+  const e = elapsed();
+  const pend = plan.events.filter(ev => !M.acks.includes(ev.t));
+  const nx = pend[0] || null;
+  const doneBefore = plan.events.filter(ev => M.acks.includes(ev.t) && (!nx || ev.t < nx.t)).map(ev => ev.t);
+  let lt = Math.max(e, doneBefore.length ? Math.max(...doneBefore) : 0);
+  if (nx && lt >= nx.t) lt = nx.t - 0.01;
+  const toGo = nx ? nx.t - e : null;
+  const mode = !nx ? "none" : toGo <= 0.001 ? "due" : toGo <= 30 ? "soon" : "idle";
+  return { e, pend, nx, lt, toGo, mode, ph: phase(e) };
+}
+function countdownText(st){
+  if (!st.nx) return "";
+  if (st.mode === "due"){
+    if (st.ph === "half") return "nu, in de rust";
+    const late = st.e - st.nx.t;
+    return late >= 1 ? "nu · " + clockFmt(late) + " te laat" : "nu!";
+  }
+  return "over " + waitFmt(st.toGo);
+}
+const cdText = (at, e) => at - e <= 0.001 ? "nu" : waitFmt(at - e);
+function mainButton(ph){
+  switch (ph){
+    case "start": return ["start", "Start wedstrijd"];
+    case "half": return ["start", "Start 2e helft"];
+    case "end": return ["new", "Nieuwe wedstrijd"];
+    case "run1": case "run2": return ["pause", "Klok stilzetten"];
+    default: return ["start", "Klok verder"];
+  }
+}
+function changeHTML(c){
+  const spotTxt = s => multiSpot(c.G) ? ` <small>${esc(s)}</small>` : "";
+  let h = `<div class="change"><div class="chGroup">${esc(c.G.g.name)}</div>`;
+  if (c.out.length) h += `<div class="chLine"><span class="lbl out">Eruit</span>${c.out.map(x => esc(x.p.name) + (x.hurt ? " <small>geblesseerd</small>" : "")).join(", ")}</div>`;
+  if (c.inn.length) h += `<div class="chLine"><span class="lbl in">Erin</span>${c.inn.map(x => esc(x.p.name) + spotTxt(x.spot)).join(", ")}</div>`;
+  c.moves.forEach(m => { h += `<div class="chLine"><span class="lbl move">Schuift</span>${esc(m.p.name)} <small>naar ${esc(m.to)}</small></div>`; });
+  return h + "</div>";
+}
+function compactText(ev){
+  return ev.changes.map(c => {
+    const parts = [];
+    if (c.out.length) parts.push(`${esc(joinNames(c.out.map(x => x.p.name + (x.hurt ? " (geblesseerd)" : ""))))} eruit`);
+    if (c.inn.length) parts.push(`${esc(joinNames(c.inn.map(x => x.p.name)))} erin`);
+    c.moves.forEach(m => parts.push(`${esc(m.p.name)} naar ${esc(m.to)}`));
+    return `<b>${esc(c.G.g.name)}:</b> ${parts.join(", ")}`;
+  }).join("<br>");
+}
+function sheetHTML(){
+  if (!pick) return "";
+  const p = S.players.find(x => x.id === pick);
+  if (!p){ pick = null; return ""; }
+  const o = activeOut(p.id);
+  const body = o
+    ? `<p>${esc(p.name)} is geblesseerd sinds minuut ${tFmt(o.from)}. Zet haar terug, dan krijgt ze weer speeltijd in het schema.</p>
+       <div class="sheetBtns"><button class="btnOk" data-action="fit">Weer inzetbaar</button></div>`
+    : `<p>Haal ${esc(p.name)} uit het schema. De wissels voor de rest van de wedstrijd worden opnieuw verdeeld over de speelsters die er nog zijn.</p>
+       <div class="sheetBtns"><button class="btnDanger" data-action="injure">Geblesseerd</button></div>`;
+  return `<div class="sheet" id="sheet" role="group" aria-label="${esc(p.name)}">
+    <div class="sheetHead"><strong>${esc(p.name)}</strong><button class="btnText" data-action="pick-close">Sluiten</button></div>${body}</div>`;
+}
+
+let liveKey = "";
+function renderLive(force){
+  const st = liveState();
+  const blocksKey = plan.groups.map(G => G.blocks.indexOf(blockAt(G, st.lt))).join(",");
+  const key = [st.ph, st.nx ? st.nx.t : -1, st.mode, blocksKey, M.acks.join("."), armed.key === "reset", pick, JSON.stringify(M.outs)].join("|");
+  if (force || key !== liveKey){
+    liveKey = key;
+    const [act, label] = mainButton(st.ph);
+    const markers = plan.events.map(ev => `<i class="${M.acks.includes(ev.t) ? "done" : ""}" style="left:${ev.t / plan.T * 100}%"></i>`).join("");
+    const hl = st.mode === "due" || st.mode === "soon";
+    const outIds = new Set(hl ? st.nx.changes.flatMap(c => c.out.map(x => x.p.id)) : []);
+    const inIds = new Set(hl ? st.nx.changes.flatMap(c => c.inn.map(x => x.p.id)) : []);
+
+    let next;
+    if (!st.nx){
+      next = `<div class="next"><p class="nextEmpty">${st.ph === "end" ? "De wedstrijd is afgelopen." : "Geen wissels meer deze wedstrijd."}</p></div>`;
+    } else {
+      const at = st.nx.t === plan.H ? "Wissel in de rust" : `Volgende wissel · minuut ${tFmt(st.nx.t)}`;
+      next = `<div class="next ${st.mode}" role="status">
+        <div class="nextTop"><span class="eyebrow">${at}</span><span class="countdown" id="countdown">${countdownText(st)}</span></div>
+        <div class="changes">${st.nx.changes.map(changeHTML).join("")}</div>
+        <button class="btnAck" data-action="ack">Gewisseld</button>
+      </div>`;
+    }
+
+    const bands = plan.groups.map(G => {
+      const B = blockAt(G, st.lt);
+      const chips = B.slots.map((p, i) => {
+        if (!p) return `<div class="pChip empty"><b>open</b><small>${esc(G.g.spots[i])}</small></div>`;
+        const goes = G.blocks.find(X => X.start > st.lt && !X.slots.includes(p));
+        const wait = goes ? `<span class="pWait">eruit over <span class="cd" data-at="${goes.start}">${cdText(goes.start, st.e)}</span></span>` : `<span class="pWait">speelt uit</span>`;
+        return `<button class="pChip${outIds.has(p.id) ? " out" : ""}${pick === p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(p.id)}">${outIds.has(p.id) ? '<span class="tag out">eruit</span>' : ""}<b>${esc(p.name)}</b><small>${esc(G.g.spots[i])}</small>${wait}</button>`;
+      }).join("");
+      return `<div class="band"><span class="bandLabel">${esc(G.g.name)}</span><div class="bandRow">${chips}</div></div>`;
+    }).join("");
+
+    const benchPl = plan.groups.flatMap(G => {
+      const B = blockAt(G, st.lt);
+      return B.bench.map(p => {
+        const back = G.blocks.find(X => X.start > st.lt && X.slots.includes(p));
+        return { p, G, back: back ? back.start : null };
+      });
+    }).sort((a, b) => (a.back ?? 1e9) - (b.back ?? 1e9));
+    const hurt = M.outs.filter(o => o.to == null).map(o => S.players.find(p => p.id === o.pid)).filter(Boolean);
+    const benchChips = benchPl.map(x => `<button class="bChip${inIds.has(x.p.id) ? " in" : ""}${pick === x.p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(x.p.id)}">
+        ${inIds.has(x.p.id) ? '<span class="tag in">erin</span>' : ""}<b>${esc(x.p.name)}</b><small>${esc(x.G.g.name)}</small>
+        ${x.back != null ? `<span class="bWait"><span>erin over</span><strong class="cd" data-at="${x.back}">${cdText(x.back, st.e)}</strong></span>` : `<span class="bWait"><span>blijft op de bank</span></span>`}
+      </button>`).join("") + hurt.map(p => `<button class="bChip inj${pick === p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc((S.groups.find(g => g.id === p.group) || {}).name || "")}</small><span class="injTag">Geblesseerd</span></button>`).join("");
+    const bench = `<div class="bench">
+      <div class="benchHead"><strong>Wissels</strong><span>${benchPl.length ? benchPl.length + " op de bank" : "niemand op de bank"}${hurt.length ? " · " + hurt.length + " geblesseerd" : ""}</span></div>
+      ${benchChips ? `<div class="benchRow">${benchChips}</div>` : `<span class="muted">Iedereen staat in het veld.</span>`}
+    </div>`;
+
+    const rest = st.pend.slice(1);
+    const later = rest.length ? `<div class="later"><h3>Daarna</h3><ul class="evList">${rest.map(ev => `<li><span class="tpill">${tFmt(ev.t)}</span><span class="evText">${ev.t === plan.H ? "<b>Rust.</b> " : ""}${compactText(ev)}</span><span class="evWait">over <span class="cd" data-at="${ev.t}">${cdText(ev.t, st.e)}</span></span></li>`).join("")}</ul></div>` : "";
+
+    const restNote = st.ph === "half" ? `<p class="restNote">De klok staat stil. Druk op start als de 2e helft begint.</p>` : "";
+    $("#tab-live").innerHTML = `
+      <div class="board">
+        <div class="boardTop"><span class="phase" id="phase">${phaseText(st.ph)}</span><span>2 × ${S.halfMin} min</span></div>
+        <div class="clock" id="clock" aria-live="off">${clockFmt(st.e)}</div>
+        <div class="track" aria-hidden="true"><div class="trackFill" id="trackFill" style="width:${st.e / plan.T * 100}%"></div>${markers}<div class="trackHalf"></div></div>
+        <div class="trackLabels" aria-hidden="true"><span>0</span><span>${S.halfMin}</span><span>${2 * S.halfMin}</span></div>
+        <div class="controls">
+          <button class="btnMain" data-action="${act}">${label}</button>
+          <button class="btnGhost" data-action="minus" aria-label="10 seconden terug">−10s</button>
+          <button class="btnGhost" data-action="plus" aria-label="10 seconden vooruit">+10s</button>
+        </div>
+        ${restNote}
+      </div>
+      ${next}
+      <h2 class="secTitle">Op het veld <span>${st.ph === "start" ? "opstelling bij de start" : "nu"}</span></h2>
+      <p class="tapHint">Blessure? Tik op de speelster.</p>
+      <div class="pitch"><span class="circ top"></span><span class="circ bot"></span>${bands}</div>
+      ${sheetHTML()}
+      ${bench}
+      ${later}
+      <div class="resetRow"><button class="btnText${armed.key === "reset" ? " armed" : ""}" data-action="reset">${armed.key === "reset" ? "Tik nog eens om de klok en wissels te wissen" : "Wedstrijd opnieuw beginnen"}</button></div>`;
+  } else {
+    const c = $("#clock"); if (c) c.textContent = clockFmt(st.e);
+    const f = $("#trackFill"); if (f) f.style.width = (st.e / plan.T * 100) + "%";
+    const cd = $("#countdown"); if (cd) cd.textContent = countdownText(st);
+    const ph = $("#phase"); if (ph) ph.textContent = phaseText(st.ph);
+    document.querySelectorAll("#tab-live .cd").forEach(el => { el.textContent = cdText(+el.dataset.at, st.e); });
+  }
+}
+
+function setOut(pid, injured){
+  const t = Math.round(elapsed());
+  if (injured){
+    M.outs.push({ pid, from: t, to: null });
+  } else {
+    const o = activeOut(pid);
+    if (!o) return;
+    if (t - o.from < 5) M.outs.splice(M.outs.indexOf(o), 1); else o.to = t;
+  }
+  plan = buildPlan();
+  // swaps that were already due count as done; the change at this moment needs no alarm
+  plan.events.forEach(ev => { if (ev.t < t && !M.acks.includes(ev.t)) M.acks.push(ev.t); });
+  if (!M.pre.includes(t)) M.pre.push(t);
+  if (!M.alarmed.includes(t)) M.alarmed.push(t);
+  saveMatch();
+}
+
+$("#tab-live").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-action]"); if (!b) return;
+  const a = b.dataset.action;
+  if (a === "start") startClock();
+  else if (a === "pause") pauseClock();
+  else if (a === "minus") adjust(-10);
+  else if (a === "plus") adjust(10);
+  else if (a === "ack"){ const st = liveState(); if (st.nx){ M.acks.push(st.nx.t); saveMatch(); } }
+  else if (a === "pick"){
+    pick = pick === b.dataset.pid ? null : b.dataset.pid;
+    renderLive(true);
+    const sh = $("#sheet"); if (sh) sh.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return;
+  }
+  else if (a === "pick-close") pick = null;
+  else if (a === "injure"){ setOut(pick, true); pick = null; }
+  else if (a === "fit"){ setOut(pick, false); pick = null; }
+  else if (a === "new" || a === "reset"){
+    if (a === "reset" && !isArmed("reset")){ arm("reset"); renderLive(true); return; }
+    M = freshMatch(); saveMatch(); disarm(); pick = null; plan = buildPlan();
+  }
+  renderLive(true);
+});
+
+function arm(k){ armed = { key: k, at: Date.now() }; }
+function isArmed(k){ return armed.key === k && Date.now() - armed.at < 5000; }
+function disarm(){ armed = { key: null, at: 0 }; }
+
+function tick(){
+  const r = clampRun();
+  if (armed.key && Date.now() - armed.at > 5000){ disarm(); liveKey = ""; if (UI.tab === "team") renderTeam(); }
+  const st = liveState();
+  let rang = false;
+  if (st.nx && (running() || r)){
+    if (st.toGo <= 30 && st.toGo > 0.5 && !M.pre.includes(st.nx.t)){ M.pre.push(st.nx.t); saveMatch(); preAlarm(st.nx); rang = true; }
+    if (st.toGo <= 0.001 && !M.alarmed.includes(st.nx.t)){ M.alarmed.push(st.nx.t); saveMatch(); alarm(st.nx); rang = true; }
+  }
+  if (r && !rang) whistle(r);
+  if (UI.tab === "live") renderLive(false);
+}
+setInterval(tick, 250);
+
+/* ---------- plan view ---------- */
+function planText(){
+  const H = plan.H, L = [];
+  L.push(`Wisselschema · 2 × ${S.halfMin} min`, "");
+  plan.groups.forEach(G => {
+    const B = G.blocks[0];
+    const names = B.slots.map((p, i) => (p ? p.name : "open") + (multiSpot(G) ? ` (${G.g.spots[i]})` : ""));
+    L.push(`🔹 ${G.g.name}: ${names.join(" – ")}`);
+  });
+  const bench0 = plan.groups.flatMap(G => G.blocks[0].bench.map(p => p.name));
+  if (bench0.length) L.push(`🔄 Bank: ${bench0.join(", ")}`);
+  plan.groups.forEach(G => {
+    if (!G.blocks.some(B => B.bench.length)) return;
+    L.push("", `Wissels ${G.g.name.toLowerCase()} – elke ${durFmt(H / G.n)} min`);
+    let lastHalf = -1;
+    G.blocks.forEach((B, i) => {
+      if (B.half !== lastHalf){ L.push("", B.half ? "2e helft" : "1e helft"); lastHalf = B.half; }
+      let line = `• ${tFmt(B.start)}–${tFmt(B.end)} → ${B.bench.length ? joinNames(B.bench.map(p => p.name)) + " wissel" : "geen wissel"}`;
+      if (i > 0){
+        const A = G.blocks[i - 1];
+        const aOn = A.slots.filter(Boolean);
+        const inn = B.slots.filter(p => p && !aOn.includes(p)).map(p => p.name + (multiSpot(G) ? ` (${G.g.spots[B.slots.indexOf(p)]})` : ""));
+        const moves = B.slots.filter(p => p && aOn.includes(p) && G.g.spots[A.slots.indexOf(p)] !== G.g.spots[B.slots.indexOf(p)])
+          .map(p => `${p.name} naar ${G.g.spots[B.slots.indexOf(p)]}`);
+        if (inn.length) line += ` → ${joinNames(inn)} erin`;
+        if (moves.length) line += `, ${moves.join(", ")}`;
+      }
+      L.push(line);
+    });
+  });
+  return L.join("\n");
+}
+
+function renderPlan(){
+  const T = plan.T, H = plan.H;
+  const ticks = [];
+  for (let m = 0; m <= 2 * S.halfMin; m += 5) ticks.push(`<span style="left:${m * 60 / T * 100}%">${m}</span>`);
+  if ((2 * S.halfMin) % 5) ticks.push(`<span style="left:100%">${2 * S.halfMin}</span>`);
+  let rows = "";
+  plan.groups.forEach(G => {
+    const sum = groupSummary(G);
+    rows += `<div class="gGroup"><strong>${esc(G.g.name)}</strong><span>${esc(sum.text)}</span></div>`;
+    G.members.forEach(p => {
+      const segs = [];
+      G.blocks.forEach(B => {
+        const idx = B.slots.indexOf(p);
+        const st = idx >= 0 ? "on" : B.bench.includes(p) ? "off" : "inj", spot = idx >= 0 ? G.g.spots[idx] : "";
+        const last = segs[segs.length - 1];
+        if (last && last.st === st && last.spot === spot && last.end === B.start) last.end = B.end;
+        else segs.push({ st, spot, start: B.start, end: B.end });
+      });
+      const html = segs.map(s => {
+        const w = (s.end - s.start) / T * 100;
+        const text = s.st === "on" ? s.spot : s.st === "inj" ? "blessure" : "";
+        const lab = text && w >= 16 ? `<em>${esc(text)}</em>` : "";
+        const cls = s.st === "on" ? "g" + (G.gi % 4) : s.st;
+        return `<span class="seg ${cls}" style="left:${s.start / T * 100}%;width:${w}%">${lab}</span>`;
+      }).join("");
+      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i></div><div class="gTot">${durFmt(G.played.get(p.id))}</div></div>`;
+    });
+  });
+  const absent = S.players.filter(p => !p.present).map(p => p.name);
+  const anyInj = M.outs.length > 0;
+
+  let evHtml = "", lastHead = "";
+  plan.events.forEach(ev => {
+    const head = ev.t === H ? "In de rust" : ev.t < H ? "1e helft" : "2e helft";
+    if (head !== lastHead){ if (lastHead) evHtml += "</ul>"; evHtml += `<div class="halfHead">${head}</div><ul class="evList">`; lastHead = head; }
+    evHtml += `<li class="${M.acks.includes(ev.t) ? "done" : ""}"><span class="tpill">${tFmt(ev.t)}</span><span class="evText">${compactText(ev)}</span><span></span></li>`;
+  });
+  if (lastHead) evHtml += "</ul>"; else evHtml = `<p class="muted">Er hoeft niet gewisseld te worden.</p>`;
+
+  $("#tab-plan").innerHTML = `
+    <div class="planHead"><h2>Schema</h2><button class="btnSecondary" data-action="copy" id="copyBtn">Kopieer als tekst</button></div>
+    <p class="lead">Wie wanneer speelt, per linie. De lijn in het midden is de rust. Rechts staat de speeltijd in minuten.</p>
+    <div class="card">
+      <div class="ganttWrap"><div class="gantt">
+        <div class="gHead"><div></div><div class="gAxis">${ticks.join("")}</div><div class="gTot">min</div></div>
+        ${rows}
+      </div></div>
+      <div class="legend"><span><i class="lOn"></i>in het veld</span><span><i class="lOff"></i>op de bank</span>${anyInj ? '<span><i class="lInj"></i>geblesseerd</span>' : ""}</div>
+      ${absent.length ? `<p class="absent">Afwezig: ${esc(absent.join(", "))}</p>` : ""}
+    </div>
+    <div class="card" id="copyFallback" hidden>
+      <h3>Tekst om te kopiëren</h3>
+      <textarea class="copyBox" id="copyText" readonly></textarea>
+    </div>
+    <div class="card"><h2>Wisselmomenten</h2>${evHtml}</div>`;
+}
+$("#tab-plan").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-action='copy']"); if (!b) return;
+  const text = planText();
+  const fallback = () => {
+    const box = $("#copyFallback"), ta = $("#copyText");
+    ta.value = text; box.hidden = false; ta.focus(); ta.select();
+    b.textContent = "Selecteer en kopieer hieronder";
+  };
+  try {
+    navigator.clipboard.writeText(text).then(() => {
+      b.textContent = "Gekopieerd";
+      setTimeout(() => { b.textContent = "Kopieer als tekst"; }, 2000);
+    }, fallback);
+  } catch(e){ fallback(); }
+});
+
+/* ---------- team view ---------- */
+function renderTeam(){
+  const groupOpts = sel => S.groups.map(g => `<option value="${esc(g.id)}"${g.id === sel ? " selected" : ""}>${esc(g.name)}</option>`).join("");
+  let html = `<div class="card">
+      <h2>Schema invullen</h2>
+      <ol class="steps">
+        <li><b>Zet wie er is</b> en wie in welke linie speelt.</li>
+        <li><b>Zet de volgorde:</b> nummer 1 gaat als eerste naar de bank.</li>
+        <li><b>Kies het aantal wisselmomenten</b> per helft. Het schema maakt de app zelf.</li>
+      </ol>
+      <div class="stepRow" style="margin-top:12px"><span>Minuten per helft</span>
+        <div class="stepper"><button data-action="half-dec" aria-label="Minder minuten">−</button><output>${S.halfMin}</output><button data-action="half-inc" aria-label="Meer minuten">+</button></div>
+      </div>
+    </div>`;
+  plan.groups.forEach(G => {
+    const g = G.g, sum = groupSummary(G);
+    const spotNames = [...new Set(g.spots)];
+    const inGroup = S.players.filter(p => p.group === g.id);
+    let rank = 0;
+    const rows = inGroup.map(p => {
+      const nr = p.present ? ++rank : "–";
+      const delArmed = isArmed("del:" + p.id);
+      return `<li class="rRow${p.present ? "" : " absentRow"}">
+        <span class="rNum">${nr}</span>
+        <input class="rName" id="pname-${esc(p.id)}" data-field="pname" data-pid="${esc(p.id)}" value="${esc(p.name)}" aria-label="Naam">
+        <label class="switch"><input type="checkbox" id="pres-${esc(p.id)}" data-field="present" data-pid="${esc(p.id)}"${p.present ? " checked" : ""}>${p.present ? "Aanwezig" : "Afwezig"}</label>
+        <div class="rMeta">
+          <select id="pref-${esc(p.id)}" data-field="pref" data-pid="${esc(p.id)}" aria-label="Voorkeurspositie">
+            <option value="">Elke positie</option>${spotNames.map(s => `<option${p.pref === s ? " selected" : ""}>${esc(s)}</option>`).join("")}
+          </select>
+          ${S.groups.length > 1 ? `<select id="pgrp-${esc(p.id)}" data-field="pgroup" data-pid="${esc(p.id)}" aria-label="Linie">${groupOpts(g.id)}</select>` : ""}
+          <span class="rBtns">
+            <button data-action="up" data-pid="${esc(p.id)}" aria-label="Eerder naar de bank">↑</button>
+            <button data-action="down" data-pid="${esc(p.id)}" aria-label="Later naar de bank">↓</button>
+            <button data-action="del" data-pid="${esc(p.id)}" class="${delArmed ? "armed" : ""}" aria-label="Verwijder ${esc(p.name)}">${delArmed ? "Verwijder" : "×"}</button>
+          </span>
+        </div>
+      </li>`;
+    }).join("");
+    const auto = g.blocks === "auto";
+    html += `<div class="card">
+      <input class="gcName" id="gname-${esc(g.id)}" data-field="gname" data-gid="${esc(g.id)}" value="${esc(g.name)}" aria-label="Naam linie">
+      <div class="field"><span class="fLabel">Posities in het veld</span>
+        <div class="spots">${g.spots.map((s, i) => `<span class="spot"><input id="spot-${esc(g.id)}-${i}" data-field="spot" data-gid="${esc(g.id)}" data-idx="${i}" value="${esc(s)}" size="${Math.max(4, s.length)}" aria-label="Positie ${i + 1}">${g.spots.length > 1 ? `<button data-action="spot-del" data-gid="${esc(g.id)}" data-idx="${i}" aria-label="Verwijder positie ${esc(s)}">×</button>` : ""}</span>`).join("")}
+          <button class="btnSmall" data-action="spot-add" data-gid="${esc(g.id)}">+ positie</button>
+        </div>
+      </div>
+      <div class="field"><span class="fLabel">Wisselmomenten per helft</span>
+        <div class="blocksRow">
+          <div class="stepper"><button data-action="blocks-dec" data-gid="${esc(g.id)}" aria-label="Minder wisselmomenten">−</button><output>${auto ? "auto · " + G.n : G.n}</output><button data-action="blocks-inc" data-gid="${esc(g.id)}" aria-label="Meer wisselmomenten">+</button></div>
+          ${auto ? "" : `<button class="btnSmall" data-action="blocks-auto" data-gid="${esc(g.id)}">Automatisch</button>`}
+        </div>
+      </div>
+      <p class="gcSummary ${sum.cls}">${esc(sum.text)}</p>
+      <span class="fLabel">Speelsters · nummer 1 gaat als eerste naar de bank</span>
+      <ul class="roster">${rows || '<li class="rRow"><span></span><span class="muted">Nog niemand in deze linie.</span></li>'}</ul>
+      <div class="addRow"><input id="add-${esc(g.id)}" data-add="${esc(g.id)}" placeholder="Naam nieuwe speelster" aria-label="Naam nieuwe speelster"><button data-action="player-add" data-gid="${esc(g.id)}">Toevoegen</button></div>
+      ${S.groups.length > 1 ? `<div class="resetRow"><button class="btnText danger" data-action="group-del" data-gid="${esc(g.id)}">${isArmed("gdel:" + g.id) ? "Tik nog eens: linie verwijderen" : "Linie verwijderen"}</button></div>` : ""}
+    </div>`;
+  });
+  html += `<div class="teamFoot">
+      <button class="btnSecondary" data-action="group-add">+ Linie toevoegen</button>
+      <button class="btnText${isArmed("resetTeam") ? " armed" : ""}" data-action="reset-team">${isArmed("resetTeam") ? "Tik nog eens: voorbeeldteam terugzetten" : "Voorbeeldteam terugzetten"}</button>
+    </div>
+    <p class="note">Je team en de lopende wedstrijd worden op dit apparaat bewaard. Op een ander toestel zie je het voorbeeldteam.</p>`;
+  $("#tab-team").innerHTML = html;
+}
+function commit(rerender){
+  saveTeam(); plan = buildPlan(); liveKey = ""; renderHeader();
+  if (rerender !== false) renderTeam();
+}
+const findP = id => S.players.find(p => p.id === id);
+const findG = id => S.groups.find(g => g.id === id);
+function addPlayer(gid){
+  const inp = document.getElementById("add-" + gid);
+  const name = inp && inp.value.trim();
+  if (!name){ inp && inp.focus(); return; }
+  S.players.push({ id: uid("p-"), name, group: gid, pref: "", present: true });
+  commit();
+  const again = document.getElementById("add-" + gid); if (again) again.focus();
+}
+$("#tab-team").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-action]"); if (!b) return;
+  const a = b.dataset.action, g = findG(b.dataset.gid), pid = b.dataset.pid;
+  switch (a){
+    case "half-dec": S.halfMin = Math.max(5, S.halfMin - 1); break;
+    case "half-inc": S.halfMin = Math.min(45, S.halfMin + 1); break;
+    case "blocks-dec": { const G = plan.groups.find(x => x.g === g); g.blocks = Math.max(1, G.n - 1); break; }
+    case "blocks-inc": { const G = plan.groups.find(x => x.g === g); g.blocks = Math.min(12, G.n + 1); break; }
+    case "blocks-auto": g.blocks = "auto"; break;
+    case "spot-add": g.spots.push(g.spots[g.spots.length - 1] || "Positie"); break;
+    case "spot-del": if (g.spots.length > 1) g.spots.splice(+b.dataset.idx, 1); break;
+    case "player-add": addPlayer(g.id); return;
+    case "up": case "down": {
+      const p = findP(pid), same = S.players.filter(x => x.group === p.group);
+      const k = same.indexOf(p), j = a === "up" ? k - 1 : k + 1;
+      if (j < 0 || j >= same.length) return;
+      const i1 = S.players.indexOf(p), i2 = S.players.indexOf(same[j]);
+      [S.players[i1], S.players[i2]] = [S.players[i2], S.players[i1]];
+      break;
+    }
+    case "del":
+      if (!isArmed("del:" + pid)){ arm("del:" + pid); renderTeam(); return; }
+      S.players = S.players.filter(p => p.id !== pid); disarm(); break;
+    case "group-add": S.groups.push({ id: uid("g-"), name: "Nieuwe linie", spots: ["Positie"], blocks: "auto" }); break;
+    case "group-del": {
+      if (!isArmed("gdel:" + g.id)){ arm("gdel:" + g.id); renderTeam(); return; }
+      const other = S.groups.find(x => x !== g);
+      S.players.forEach(p => { if (p.group === g.id) p.group = other.id; });
+      S.groups = S.groups.filter(x => x !== g); disarm(); break;
+    }
+    case "reset-team":
+      if (!isArmed("resetTeam")){ arm("resetTeam"); renderTeam(); return; }
+      S = defaultTeam(); disarm(); break;
+    default: return;
+  }
+  commit();
+});
+$("#tab-team").addEventListener("change", ev => {
+  const t = ev.target, f = t.dataset.field; if (!f) return;
+  const p = t.dataset.pid ? findP(t.dataset.pid) : null, g = t.dataset.gid ? findG(t.dataset.gid) : null;
+  if (f === "pname"){ p.name = t.value.trim() || p.name; t.value = p.name; commit(false); return; }
+  if (f === "gname"){ g.name = t.value.trim() || g.name; }
+  if (f === "spot"){
+    const i = +t.dataset.idx, old = g.spots[i], nw = t.value.trim() || old;
+    g.spots[i] = nw;
+    if (!g.spots.includes(old)) S.players.forEach(x => { if (x.group === g.id && x.pref === old) x.pref = nw; });
+  }
+  if (f === "present") p.present = t.checked;
+  if (f === "pref") p.pref = t.value;
+  if (f === "pgroup"){ p.group = t.value; const ng = findG(t.value); if (p.pref && !ng.spots.includes(p.pref)) p.pref = ""; }
+  commit();
+});
+$("#tab-team").addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && ev.target.dataset.add){ ev.preventDefault(); addPlayer(ev.target.dataset.add); }
+});
+
+/* ---------- shell ---------- */
+const ICON_ON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
+const ICON_OFF = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>';
+function renderHeader(){
+  const n = S.players.filter(p => p.present).length;
+  $("#teamLine").textContent = `MO9 · ${n} speelsters · 2 × ${S.halfMin} min`;
+  const sb = $("#soundBtn");
+  sb.setAttribute("aria-pressed", String(UI.sound));
+  sb.innerHTML = (UI.sound ? ICON_ON : ICON_OFF) + (UI.sound ? "Geluid aan" : "Geluid uit");
+}
+$("#soundBtn").addEventListener("click", () => {
+  UI.sound = !UI.sound; saveUI(); renderHeader();
+  if (UI.sound){ ensureAudio(); preAlarm(null); }
+});
+function renderAll(){
+  renderHeader();
+  ["team", "live", "plan"].forEach(t => {
+    $("#tab-" + t).hidden = t !== UI.tab;
+    document.querySelector(`[data-tab="${t}"]`).setAttribute("aria-current", t === UI.tab ? "page" : "false");
+  });
+  if (UI.tab === "live") renderLive(true);
+  if (UI.tab === "plan") renderPlan();
+  if (UI.tab === "team") renderTeam();
+}
+document.querySelector(".tabbar").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-tab]"); if (!b) return;
+  UI.tab = b.dataset.tab; saveUI(); disarm(); pick = null; renderAll(); window.scrollTo(0, 0);
+});
+if (!["live", "plan", "team"].includes(UI.tab)) UI.tab = "live";
+if (!Array.isArray(M.outs)) M.outs = [];
+plan = buildPlan();
+clampRun();
+renderAll();
+})();
+</script>
+</body>
+</html>
