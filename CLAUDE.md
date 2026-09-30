@@ -8,5 +8,9 @@ fill in the team, run the match clock, and get an alarm when a substitution is d
 - Schedule is generated per line (voorhoede / achterhoede): whoever has played most goes to the bench,
   ties broken by the rotation order set on the "Invullen" tab. Injuries mid-match re-plan the rest.
 - State lives in `localStorage` on the device (key prefix `wisselcoach-mo9-v1`).
-- The page is also published as a claude.ai Artifact; republish from this file after changes.
+- Hosted on GitHub Pages: repo https://github.com/janarjensen/wisselcoach, site
+  https://janarjensen.github.io/wisselcoach/ (push to `main` deploys).
+- Also published as a claude.ai Artifact: https://claude.ai/artifact/K6t9sU2xkx33XEmnswCD24.
+  After every change, push to GitHub **and** republish the Artifact (pass that URL), so both stay in sync.
+- The repo is public: never commit the players' real names. Real names live only in the coach's localStorage.
 - UI text is Dutch.
