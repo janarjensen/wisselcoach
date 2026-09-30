@@ -256,6 +256,12 @@ button{cursor:pointer}
 .addRow button{border:0;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:800;padding:0 14px}
 .teamFoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .note{font-size:13px;color:var(--muted);margin:0}
+.importCard{border:2px solid var(--ok);display:flex;flex-direction:column;gap:10px}
+.importCard h2{margin:0}
+.importList{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px}
+.shareBtns{margin-top:10px}
+.shareBox{min-height:90px;margin-top:10px}
+.importLabel{display:block;margin:16px 0 6px}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:14px}
 .steps b{color:var(--ink)}
 
@@ -323,31 +329,92 @@ function defaultTeam(){
 // outs: injuries during the match, {pid, from, to|null} in match seconds
 const freshMatch = () => ({ acc: 0, runStart: null, runFrom: 0, halfAt: null, acks: [], pre: [], alarmed: [], outs: [] });
 
+// brings a team saved (or shared) by an older version up to date; returns true when it changed
+function migrate(T){
+  let changed = false;
+  // teams saved before the keeper existed get an empty keeper line once
+  if (!T.keeperAdded){
+    if (!T.groups.some(g => g.id === "g-keeper" || /keep/i.test(g.name))) T.groups.push({ id: "g-keeper", name: "Keeper", spots: ["Keeper"], blocks: 1 });
+    T.keeperAdded = true; changed = true;
+  }
+  // teams saved with "Voor/Achter" spots move to left / middle / right once
+  if (!T.sidesAdded){
+    T.groups.forEach(g => {
+      const old = [...new Set(g.spots.filter(s => s === "Voor" || s === "Achter"))];
+      old.forEach(name => {
+        const count = g.spots.filter(s => s === name).length;
+        const sides = count === 1 ? ["Midden"] : count === 2 ? ["Links", "Rechts"] : null;
+        if (!sides) return;
+        let k = 0;
+        g.spots = g.spots.map(s => s === name ? sides[k++] : s);
+        k = 0;
+        T.players.forEach(p => { if (p.group === g.id && p.pref === name) p.pref = sides[Math.min(k++, sides.length - 1)]; });
+      });
+    });
+    T.sidesAdded = true; changed = true;
+  }
+  return changed;
+}
+
+/* ---------- sharing: the team travels as base64url JSON in a link (#t=...) ---------- */
+const PUBLIC_URL = "https://janarjensen.github.io/wisselcoach/";
+function shareBase(){
+  try { if (/^https?:$/.test(location.protocol) && location.hostname.endsWith("github.io")) return location.origin + location.pathname; } catch(e){}
+  return PUBLIC_URL;
+}
+function encodeTeam(T){
+  const data = { v: 1, halfMin: T.halfMin, groups: T.groups, players: T.players.map(p => ({ id: p.id, name: p.name, group: p.group, pref: p.pref, present: p.present })) };
+  let bin = "";
+  new TextEncoder().encode(JSON.stringify(data)).forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function decodeTeam(text){
+  try {
+    let s = String(text).trim();
+    const m = s.match(/[#&?]t=([A-Za-z0-9_-]+)/);
+    if (m) s = m[1];
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bytes = Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    return cleanTeam(JSON.parse(new TextDecoder().decode(bytes)));
+  } catch(e){ return null; }
+}
+// never trust a pasted team: keep only known fields with sane types and sizes
+function cleanTeam(o){
+  if (!o || !Array.isArray(o.groups) || !Array.isArray(o.players) || !o.groups.length) return null;
+  const str = (v, max) => typeof v === "string" ? v.trim().slice(0, max) : "";
+  const groups = o.groups.slice(0, 10).map(g => ({
+    id: str(g.id, 40) || uid("g-"),
+    name: str(g.name, 40) || "Linie",
+    spots: (Array.isArray(g.spots) && g.spots.length ? g.spots : ["Midden"]).slice(0, 11).map(s => str(s, 20) || "Midden"),
+    blocks: g.blocks === "auto" ? "auto" : Math.min(12, Math.max(1, parseInt(g.blocks, 10) || 1))
+  }));
+  const ids = new Set(groups.map(g => g.id));
+  const players = o.players.slice(0, 40).map(p => ({
+    id: str(p.id, 40) || uid("p-"),
+    name: str(p.name, 40) || "Speelster",
+    group: ids.has(p.group) ? p.group : groups[0].id,
+    pref: str(p.pref, 20),
+    present: p.present !== false
+  }));
+  const T = { halfMin: Math.min(45, Math.max(5, parseInt(o.halfMin, 10) || 25)), groups, players };
+  migrate(T);
+  return T;
+}
+
 let S = load("team", null);
 if (!S || !Array.isArray(S.groups) || !Array.isArray(S.players) || !S.groups.length) S = defaultTeam();
-// teams saved before the keeper existed get an empty keeper line once
-if (!S.keeperAdded){
-  if (!S.groups.some(g => g.id === "g-keeper" || /keep/i.test(g.name))) S.groups.push({ id: "g-keeper", name: "Keeper", spots: ["Keeper"], blocks: 1 });
-  S.keeperAdded = true;
-  store("team", S);
-}
-// teams saved with "Voor/Achter" spots move to left / middle / right once
-if (!S.sidesAdded){
-  S.groups.forEach(g => {
-    const old = [...new Set(g.spots.filter(s => s === "Voor" || s === "Achter"))];
-    old.forEach(name => {
-      const count = g.spots.filter(s => s === name).length;
-      const sides = count === 1 ? ["Midden"] : count === 2 ? ["Links", "Rechts"] : null;
-      if (!sides) return;
-      let k = 0;
-      g.spots = g.spots.map(s => s === name ? sides[k++] : s);
-      k = 0;
-      S.players.forEach(p => { if (p.group === g.id && p.pref === name) p.pref = sides[Math.min(k++, sides.length - 1)]; });
-    });
-  });
-  S.sidesAdded = true;
-  store("team", S);
-}
+if (migrate(S)) store("team", S);
+
+// a team shared by the other coach arrives in the link; ask before replacing anything
+let incoming = null, importMsg = "";
+try {
+  if (/^#t=/.test(location.hash)){
+    incoming = decodeTeam(location.hash);
+    if (!incoming) importMsg = "De deellink is niet compleet. Vraag je mede-coach om hem opnieuw te sturen.";
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+} catch(e){}
 let M = Object.assign(freshMatch(), load("match", {}));
 let UI = Object.assign({ tab: "live", sound: true }, load("ui", {}));
 let armed = { key: null, at: 0 };
@@ -892,7 +959,22 @@ $("#tab-plan").addEventListener("click", ev => {
 /* ---------- team view ---------- */
 function renderTeam(){
   const groupOpts = sel => S.groups.map(g => `<option value="${esc(g.id)}"${g.id === sel ? " selected" : ""}>${esc(g.name)}</option>`).join("");
-  let html = `<div class="card">
+  let html = "";
+  if (incoming){
+    const lines = incoming.groups.map(g => {
+      const names = incoming.players.filter(p => p.group === g.id && p.present).map(p => p.name);
+      return `<li><b>${esc(g.name)}:</b> ${names.length ? esc(names.join(", ")) : "niemand"}</li>`;
+    }).join("");
+    html += `<div class="card importCard" id="importCard">
+      <h2>Schema van je mede-coach</h2>
+      <ul class="importList">${lines}</ul>
+      <p class="note">2 × ${incoming.halfMin} min. Inladen vervangt het team dat nu op dit toestel staat.</p>
+      <div class="sheetBtns"><button class="btnOk" data-action="import-yes">Inladen</button><button class="btnSecondary" data-action="import-no">Niet inladen</button></div>
+    </div>`;
+  } else if (importMsg){
+    html += `<p class="gcSummary ${importMsg.startsWith("Schema ingeladen") ? "ok" : "warn"}">${esc(importMsg)}</p>`;
+  }
+  html += `<div class="card">
       <h2>Schema invullen</h2>
       <ol class="steps">
         <li><b>Zet wie er is</b> en wie in welke linie speelt.</li>
@@ -949,12 +1031,35 @@ function renderTeam(){
       ${S.groups.length > 1 ? `<div class="resetRow"><button class="btnText danger" data-action="group-del" data-gid="${esc(g.id)}">${isArmed("gdel:" + g.id) ? "Tik nog eens: linie verwijderen" : "Linie verwijderen"}</button></div>` : ""}
     </div>`;
   });
-  html += `<div class="teamFoot">
+  html += `<div class="card">
+      <h2>Delen met je mede-coach</h2>
+      <p class="note">Stuur de deellink via WhatsApp. Je mede-coach opent hem en tikt op Inladen. Daarna heeft zij of hij hetzelfde team en schema.</p>
+      <div class="sheetBtns shareBtns"><button class="btnSecondary" data-action="share" id="shareBtn">Kopieer deellink</button></div>
+      <textarea class="copyBox shareBox" id="shareText" readonly hidden aria-label="Deellink"></textarea>
+      <span class="fLabel importLabel">Deellink gekregen? Plak hem hier</span>
+      <div class="addRow"><input id="importCode" placeholder="Plak de deellink" aria-label="Deellink om in te laden" autocomplete="off"><button data-action="import-paste">Bekijk</button></div>
+    </div>
+    <div class="teamFoot">
       <button class="btnSecondary" data-action="group-add">+ Linie toevoegen</button>
       <button class="btnText${isArmed("resetTeam") ? " armed" : ""}" data-action="reset-team">${isArmed("resetTeam") ? "Tik nog eens: voorbeeldteam terugzetten" : "Voorbeeldteam terugzetten"}</button>
     </div>
     <p class="note">Je team en de lopende wedstrijd worden op dit apparaat bewaard. Op een ander toestel zie je het voorbeeldteam.</p>`;
   $("#tab-team").innerHTML = html;
+}
+function shareTeam(b){
+  const link = shareBase() + "#t=" + encodeTeam(S);
+  const text = `Wisselschema MO9. Open deze link en tik op Inladen:\n${link}`;
+  const fallback = () => {
+    const ta = $("#shareText");
+    ta.value = text; ta.hidden = false; ta.focus(); ta.select();
+    b.textContent = "Selecteer en kopieer hieronder";
+  };
+  try {
+    navigator.clipboard.writeText(text).then(() => {
+      b.textContent = "Deellink gekopieerd";
+      setTimeout(() => { b.textContent = "Kopieer deellink"; }, 2500);
+    }, fallback);
+  } catch(e){ fallback(); }
 }
 function commit(rerender){
   saveTeam(); plan = buildPlan(); liveKey = ""; renderHeader();
@@ -982,6 +1087,19 @@ $("#tab-team").addEventListener("click", ev => {
     case "spot-add": g.spots.push(["Links", "Midden", "Rechts"].find(s => !g.spots.includes(s)) || "Midden"); break;
     case "spot-del": if (g.spots.length > 1) g.spots.splice(+b.dataset.idx, 1); break;
     case "player-add": addPlayer(g.id); return;
+    case "share": shareTeam(b); return;
+    case "import-paste": {
+      const found = decodeTeam($("#importCode").value);
+      if (found){ incoming = found; importMsg = ""; }
+      else importMsg = "Deze deellink werkt niet. Kopieer de hele link en probeer het opnieuw.";
+      renderTeam(); window.scrollTo(0, 0);
+      return;
+    }
+    case "import-yes":
+      S = incoming; incoming = null; importMsg = "Schema ingeladen. Controleer even wie er aanwezig is.";
+      window.scrollTo(0, 0);
+      break;
+    case "import-no": incoming = null; importMsg = ""; renderTeam(); return;
     case "up": case "down": {
       const p = findP(pid), same = S.players.filter(x => x.group === p.group);
       const k = same.indexOf(p), j = a === "up" ? k - 1 : k + 1;
@@ -1052,9 +1170,10 @@ function renderAll(){
 }
 document.querySelector(".tabbar").addEventListener("click", ev => {
   const b = ev.target.closest("[data-tab]"); if (!b) return;
-  UI.tab = b.dataset.tab; saveUI(); disarm(); pick = null; renderAll(); window.scrollTo(0, 0);
+  UI.tab = b.dataset.tab; saveUI(); disarm(); pick = null; importMsg = ""; renderAll(); window.scrollTo(0, 0);
 });
 if (!["live", "plan", "team"].includes(UI.tab)) UI.tab = "live";
+if (incoming || importMsg) UI.tab = "team";
 if (!Array.isArray(M.outs)) M.outs = [];
 plan = buildPlan();
 clampRun();
