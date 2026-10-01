@@ -140,6 +140,12 @@ button{cursor:pointer}
 .tag.out{background:var(--alert);color:var(--alert-ink)}
 .tag.in{background:var(--ok);color:var(--ok-ink)}
 .tapHint{margin:-8px 0 0;font-size:12.5px;color:var(--muted)}
+.pChip,.bChip{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.dragSrc{opacity:.35}
+.dropOver{outline:3px solid var(--ball)!important;outline-offset:2px;transform:scale(1.05)}
+.dragGhost{position:fixed;z-index:50;pointer-events:none;margin:0;transform:translate(-50%,-70%) scale(1.08);box-shadow:0 10px 24px rgba(0,0,0,.35);opacity:.96}
+body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
+@media (prefers-reduced-motion: no-preference){.pChip,.bChip{transition:transform .12s}}
 
 /* player sheet (injury) */
 .sheet{background:var(--surface);border:2px solid var(--ball);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
@@ -733,10 +739,10 @@ function renderLive(force){
       const B = blockAt(G, st.lt);
       const chips = sideOrder(G.g.spots).map(i => {
         const p = B.slots[i];
-        if (!p) return `<div class="pChip empty"><b>open</b><small>${esc(G.g.spots[i])}</small></div>`;
+        if (!p) return `<div class="pChip empty" data-drop="1" data-gid="${esc(G.g.id)}" data-spot="${esc(G.g.spots[i])}"><b>open</b><small>${esc(G.g.spots[i])}</small></div>`;
         const goes = G.blocks.find(X => X.start > st.lt && !X.slots.includes(p));
         const wait = goes ? `<span class="pWait">eruit over <span class="cd" data-at="${goes.start}">${cdText(goes.start, st.e)}</span></span>` : `<span class="pWait">speelt uit</span>`;
-        return `<button class="pChip${outIds.has(p.id) ? " out" : ""}${pick === p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(p.id)}">${outIds.has(p.id) ? '<span class="tag out">eruit</span>' : ""}<b>${esc(p.name)}</b><small>${esc(G.g.spots[i])}</small>${wait}</button>`;
+        return `<button class="pChip${outIds.has(p.id) ? " out" : ""}${pick === p.id ? " sel" : ""}" data-action="pick" data-drop="1" data-pid="${esc(p.id)}">${outIds.has(p.id) ? '<span class="tag out">eruit</span>' : ""}<b>${esc(p.name)}</b><small>${esc(G.g.spots[i])}</small>${wait}</button>`;
       }).join("");
       return `<div class="band"><span class="bandLabel">${esc(G.g.name)}</span><div class="bandRow">${chips}</div></div>`;
     }).join("");
@@ -749,7 +755,7 @@ function renderLive(force){
       });
     }).sort((a, b) => (a.back ?? 1e9) - (b.back ?? 1e9));
     const hurt = M.outs.filter(o => o.to == null).map(o => S.players.find(p => p.id === o.pid)).filter(Boolean);
-    const benchChips = benchPl.map(x => `<button class="bChip${inIds.has(x.p.id) ? " in" : ""}${pick === x.p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(x.p.id)}">
+    const benchChips = benchPl.map(x => `<button class="bChip${inIds.has(x.p.id) ? " in" : ""}${pick === x.p.id ? " sel" : ""}" data-action="pick" data-drop="1" data-pid="${esc(x.p.id)}">
         ${inIds.has(x.p.id) ? '<span class="tag in">erin</span>' : ""}<b>${esc(x.p.name)}</b><small>${esc(x.G.g.name)}</small>
         ${x.back != null ? `<span class="bWait"><span>erin over</span><strong class="cd" data-at="${x.back}">${cdText(x.back, st.e)}</strong></span>` : `<span class="bWait"><span>blijft op de bank</span></span>`}
       </button>`).join("") + hurt.map(p => `<button class="bChip inj${pick === p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc((S.groups.find(g => g.id === p.group) || {}).name || "")}</small><span class="injTag">Geblesseerd</span></button>`).join("");
@@ -777,7 +783,7 @@ function renderLive(force){
       </div>
       ${next}
       <h2 class="secTitle">Op het veld <span>${st.ph === "start" ? "opstelling bij de start" : "nu"}</span></h2>
-      <p class="tapHint">Blessure? Tik op de speelster.</p>
+      <p class="tapHint">${st.ph === "start" ? "Opstelling wijzigen? Hou een speelster of wissel vast en sleep haar naar een andere plek." : "Blessure? Tik op de speelster."}</p>
       <div class="pitch"><span class="circ top"></span><span class="circ bot"></span>${bands}</div>
       ${sheetHTML()}
       ${bench}
@@ -809,7 +815,104 @@ function setOut(pid, injured){
   saveMatch();
 }
 
-$("#tab-live").addEventListener("click", ev => {
+/* ---------- line-up: long-press and drag before kick-off ---------- */
+// two players trade places: everything the one was scheduled to do, the other now does
+function swapPlayers(aId, bId){
+  const a = findP(aId), b = findP(bId);
+  if (!a || !b || a === b) return;
+  const ia = S.players.indexOf(a), ib = S.players.indexOf(b);
+  S.players[ia] = b; S.players[ib] = a;
+  [a.group, b.group] = [b.group, a.group];
+  [a.pref, b.pref] = [b.pref, a.pref];
+}
+function moveToSpot(pid, gid, spot){
+  const p = findP(pid);
+  if (!p || !findG(gid)) return;
+  p.group = gid; p.pref = spot;
+}
+const drag = { pid: null, src: null, sx: 0, sy: 0, timer: null, active: false, ghost: null, over: null, justDropped: false };
+const canDrag = () => phase(elapsed()) === "start";
+function dragDown(el, x, y){
+  if (!canDrag() || !el || !el.dataset.pid) return;
+  dragReset();
+  Object.assign(drag, { pid: el.dataset.pid, src: el, sx: x, sy: y });
+  drag.timer = setTimeout(() => dragActivate(x, y), 380);
+}
+function dragActivate(x, y){
+  if (!drag.src || !drag.src.isConnected) return dragReset();
+  drag.active = true;
+  pick = null;
+  const r = drag.src.getBoundingClientRect();
+  const g = drag.src.cloneNode(true);
+  g.classList.add("dragGhost");
+  g.removeAttribute("data-action"); g.removeAttribute("data-drop");
+  g.style.width = r.width + "px";
+  document.body.appendChild(g);
+  drag.ghost = g;
+  drag.src.classList.add("dragSrc");
+  document.body.classList.add("isDragging");
+  vibrate(30);
+  dragPlace(x, y);
+}
+function dragPlace(x, y){
+  if (!drag.ghost) return;
+  drag.ghost.style.left = x + "px";
+  drag.ghost.style.top = y + "px";
+  const hit = document.elementFromPoint(x, y);
+  const t = hit && hit.closest("#tab-live [data-drop]");
+  const over = t && t !== drag.src ? t : null;
+  if (over !== drag.over){
+    if (drag.over) drag.over.classList.remove("dropOver");
+    if (over) over.classList.add("dropOver");
+    drag.over = over;
+  }
+}
+function dragMove(x, y, ev){
+  if (!drag.pid) return;
+  if (!drag.active){
+    if (Math.hypot(x - drag.sx, y - drag.sy) > 10) dragReset();   // finger moved: it's a scroll
+    return;
+  }
+  if (ev.cancelable) ev.preventDefault();
+  dragPlace(x, y);
+}
+function dragUp(){
+  if (!drag.pid) return;
+  const wasActive = drag.active, t = drag.over, pid = drag.pid;
+  dragReset();
+  if (!wasActive) return;
+  drag.justDropped = true;
+  setTimeout(() => { drag.justDropped = false; }, 400);
+  if (!t) return;
+  if (t.dataset.pid) swapPlayers(pid, t.dataset.pid);
+  else moveToSpot(pid, t.dataset.gid, t.dataset.spot);
+  commit(false);
+  renderLive(true);
+}
+function dragReset(){
+  clearTimeout(drag.timer);
+  if (drag.ghost) drag.ghost.remove();
+  if (drag.src) drag.src.classList.remove("dragSrc");
+  if (drag.over) drag.over.classList.remove("dropOver");
+  document.body.classList.remove("isDragging");
+  Object.assign(drag, { pid: null, src: null, timer: null, active: false, ghost: null, over: null });
+}
+const liveEl = $("#tab-live");
+liveEl.addEventListener("touchstart", ev => {
+  if (ev.touches.length !== 1) return dragReset();
+  const t = ev.touches[0];
+  dragDown(ev.target.closest("[data-drop][data-pid]"), t.clientX, t.clientY);
+}, { passive: true });
+document.addEventListener("touchmove", ev => { const t = ev.touches[0]; if (t) dragMove(t.clientX, t.clientY, ev); }, { passive: false });
+document.addEventListener("touchend", dragUp);
+document.addEventListener("touchcancel", dragReset);
+liveEl.addEventListener("mousedown", ev => { if (ev.button === 0) dragDown(ev.target.closest("[data-drop][data-pid]"), ev.clientX, ev.clientY); });
+document.addEventListener("mousemove", ev => dragMove(ev.clientX, ev.clientY, ev));
+document.addEventListener("mouseup", dragUp);
+liveEl.addEventListener("contextmenu", ev => { if (drag.pid || (canDrag() && ev.target.closest("[data-drop]"))) ev.preventDefault(); });
+
+liveEl.addEventListener("click", ev => {
+  if (drag.justDropped){ ev.preventDefault(); return; }
   const b = ev.target.closest("[data-action]"); if (!b) return;
   const a = b.dataset.action;
   if (a === "start") startClock();
