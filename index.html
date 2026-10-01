@@ -262,6 +262,7 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .addRow button{border:0;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:800;padding:0 14px}
 .teamFoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .note{font-size:13px;color:var(--muted);margin:0}
+.version{margin:0;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .importCard{border:2px solid var(--ok);display:flex;flex-direction:column;gap:10px}
 .importCard h2{margin:0}
 .importList{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px}
@@ -304,6 +305,8 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 (function(){
 "use strict";
 const KEY = "wisselcoach-mo9-v1";
+// bump on every published change so the coach can tell a cached page from the latest one
+const APP_VERSION = "1 okt, 11:15";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad = n => String(n).padStart(2, "0");
@@ -788,7 +791,8 @@ function renderLive(force){
       ${sheetHTML()}
       ${bench}
       ${later}
-      <div class="resetRow"><button class="btnText${armed.key === "reset" ? " armed" : ""}" data-action="reset">${armed.key === "reset" ? "Tik nog eens om de klok en wissels te wissen" : "Wedstrijd opnieuw beginnen"}</button></div>`;
+      <div class="resetRow"><button class="btnText${armed.key === "reset" ? " armed" : ""}" data-action="reset">${armed.key === "reset" ? "Tik nog eens om de klok en wissels te wissen" : "Wedstrijd opnieuw beginnen"}</button></div>
+      <p class="version">Versie ${APP_VERSION}</p>`;
   } else {
     const c = $("#clock"); if (c) c.textContent = clockFmt(st.e);
     const f = $("#trackFill"); if (f) f.style.width = (st.e / plan.T * 100) + "%";
@@ -1146,7 +1150,8 @@ function renderTeam(){
       <button class="btnSecondary" data-action="group-add">+ Linie toevoegen</button>
       <button class="btnText${isArmed("resetTeam") ? " armed" : ""}" data-action="reset-team">${isArmed("resetTeam") ? "Tik nog eens: voorbeeldteam terugzetten" : "Voorbeeldteam terugzetten"}</button>
     </div>
-    <p class="note">Je team en de lopende wedstrijd worden op dit apparaat bewaard. Op een ander toestel zie je het voorbeeldteam.</p>`;
+    <p class="note">Je team en de lopende wedstrijd worden op dit apparaat bewaard. Op een ander toestel zie je het voorbeeldteam.</p>
+    <p class="version">Versie ${APP_VERSION}</p>`;
   $("#tab-team").innerHTML = html;
 }
 function shareTeam(b){
