@@ -210,14 +210,13 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .gAxis span:first-of-type{transform:none}
 .gAxis span:last-of-type{transform:translateX(-100%)}
 .gBar{position:relative;height:28px;border-radius:6px;background:var(--surface-2);overflow:hidden}
-.seg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-right:1px solid var(--surface)}
+.seg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .seg em{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--g-ink);white-space:nowrap;overflow:hidden;padding:0 3px}
 .seg.g0{background:var(--g0)} .seg.g1{background:var(--g1)} .seg.g2{background:var(--g2)} .seg.g3{background:var(--g3)}
 .seg.off{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 7px)}
 .seg.inj{background:var(--alert-soft)}
 .seg.inj em{color:var(--alert)}
 .gHalf{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ink);opacity:.55}
-.gPast{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--surface);opacity:.5;pointer-events:none}
 .gNow{position:absolute;left:0;top:0;bottom:0;width:3px;margin-left:-1.5px;background:var(--alert);pointer-events:none}
 .gNowTag{position:absolute;top:0;left:0;background:var(--alert);color:var(--alert-ink);border-radius:5px;padding:0 5px;font-size:11px;font-weight:800;line-height:15px;white-space:nowrap}
 .legend .lNow{width:3px;height:12px;border-radius:0;background:var(--alert)}
@@ -314,7 +313,7 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 "use strict";
 const KEY = "wisselcoach-mo9-v1";
 // bump on every published change so the coach can tell a cached page from the latest one
-const APP_VERSION = "5 okt, 11:30";
+const APP_VERSION = "5 okt, 10:45";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad = n => String(n).padStart(2, "0");
@@ -1107,7 +1106,6 @@ function planText(){
 function updatePlanNow(){
   const e = elapsed(), pct = e / plan.T * 100;
   document.querySelectorAll("#tab-plan .gNow").forEach(el => { el.style.left = pct + "%"; });
-  document.querySelectorAll("#tab-plan .gPast").forEach(el => { el.style.width = pct + "%"; });
   const tag = $("#gNowTag");
   if (tag){ tag.style.left = pct + "%"; tag.style.transform = `translateX(-${pct}%)`; tag.textContent = clockFmt(e); }
 }
@@ -1144,7 +1142,7 @@ function renderPlan(){
         const cls = s.st === "on" ? "g" + (s.gi % 4) : s.st;
         return `<span class="seg ${cls}" style="left:${s.start / T * 100}%;width:${w}%">${lab}</span>`;
       }).join("");
-      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i><i class="gPast"></i><i class="gNow"></i></div><div class="gTot">${durFmt(plan.played.get(p.id) || 0)}</div></div>`;
+      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i><i class="gNow"></i></div><div class="gTot">${durFmt(plan.played.get(p.id) || 0)}</div></div>`;
     });
   });
   const absent = S.players.filter(p => !p.present).map(p => p.name);
