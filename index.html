@@ -313,7 +313,7 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 "use strict";
 const KEY = "wisselcoach-mo9-v1";
 // bump on every published change so the coach can tell a cached page from the latest one
-const APP_VERSION = "5 okt, 11:45";
+const APP_VERSION = "5 okt, 12:00";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad = n => String(n).padStart(2, "0");
@@ -1118,7 +1118,9 @@ function renderPlan(){
   plan.groups.forEach(G => {
     const sum = groupSummary(G);
     rows += `<div class="gGroup"><strong>${esc(G.g.name)}</strong><span>${esc(sum.text)}</span></div>`;
-    G.members.forEach(p => {
+    // a girl's row sits under the line she is in right now, so a live swap moves her row over
+    const nowT = elapsed();
+    S.players.filter(p => p.present && (seatOf(p.id, nowT) || p).group === G.g.id).forEach(p => {
       const raw = [];
       plan.groups.forEach(X => X.blocks.forEach(B => {
         const idx = B.slots.indexOf(p);
@@ -1139,7 +1141,7 @@ function renderPlan(){
         const w = (s.end - s.start) / T * 100;
         const text = s.st === "on" ? s.spot : s.st === "inj" ? "blessure" : "";
         const lab = text && w >= 16 ? `<em>${esc(text)}</em>` : "";
-        const cls = s.st === "on" ? "g" + (s.gi % 4) : s.st;
+        const cls = s.st === "on" ? "g" + (G.gi % 4) : s.st;
         return `<span class="seg ${cls}" style="left:${s.start / T * 100}%;width:${w}%">${lab}</span>`;
       }).join("");
       rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i><i class="gNow"></i></div><div class="gTot">${durFmt(plan.played.get(p.id) || 0)}</div></div>`;
