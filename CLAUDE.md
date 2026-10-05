@@ -7,6 +7,10 @@ fill in the team, run the match clock, and get an alarm when a substitution is d
   so the length of the break doesn't matter.
 - Schedule is generated per line (voorhoede / achterhoede): whoever has played most goes to the bench,
   ties broken by the rotation order set on the "Invullen" tab. Injuries mid-match re-plan the rest.
+- The planner works on "seats" (a player's line, preferred side and rotation order as filled in). Dragging
+  during the match is stored in `M.swaps` and never rewrites what was already played:
+  same line, both on the pitch = sides only (`pos`, bench turns unchanged); bench ↔ pitch = trade seats;
+  another line = the coach picks: rest of the match, until the next swap moment, or re-share minutes (`rebalance`).
 - State lives in `localStorage` on the device (key prefix `wisselcoach-mo9-v1`).
 - Hosted on GitHub Pages: repo https://github.com/janarjensen/wisselcoach, site
   https://janarjensen.github.io/wisselcoach/ (push to `main` deploys).

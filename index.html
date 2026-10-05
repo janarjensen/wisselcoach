@@ -153,6 +153,10 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .sheetHead strong{font-family:var(--font-display);font-size:22px}
 .sheet p{margin:0;color:var(--muted);max-width:60ch}
 .sheetBtns{display:flex;gap:8px;flex-wrap:wrap}
+.choices{display:flex;flex-direction:column;gap:8px}
+.choice{text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.choice b{font-weight:800;font-size:15px}
+.choice span{font-size:13px;color:var(--muted)}
 .btnDanger{border:0;border-radius:10px;background:var(--alert);color:var(--alert-ink);font-weight:800;padding:11px 18px}
 .btnOk{border:0;border-radius:10px;background:var(--ok);color:var(--ok-ink);font-weight:800;padding:11px 18px}
 
@@ -310,7 +314,7 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 "use strict";
 const KEY = "wisselcoach-mo9-v1";
 // bump on every published change so the coach can tell a cached page from the latest one
-const APP_VERSION = "5 okt, 10:35";
+const APP_VERSION = "5 okt, 11:30";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad = n => String(n).padStart(2, "0");
@@ -340,7 +344,7 @@ function defaultTeam(){
   };
 }
 // outs: injuries during the match, {pid, from, to|null} in match seconds
-const freshMatch = () => ({ acc: 0, runStart: null, runFrom: 0, halfAt: null, acks: [], pre: [], alarmed: [], outs: [] });
+const freshMatch = () => ({ acc: 0, runStart: null, runFrom: 0, halfAt: null, acks: [], pre: [], alarmed: [], outs: [], swaps: [] });
 
 // brings a team saved (or shared) by an older version up to date; returns true when it changed
 function migrate(T){
@@ -460,14 +464,15 @@ function autoBlocks(P, b, halfMin){
 }
 function fairN(P, b){ for (let n = 1; n <= 12; n++) if ((2 * n * b) % P === 0) return n; return null; }
 
-function assignSlots(spots, onField, prev){
+function assignSlots(spots, onField, prev, prefOf = p => p.pref){
   const slots = spots.map(() => null), placed = new Set();
   const prevIdx = p => prev ? prev.indexOf(p) : -1;
   for (const p of onField){           // 1. preferred position, same spot as before if possible
-    if (!p.pref) continue;
+    const pref = prefOf(p);
+    if (!pref) continue;
     const pi = prevIdx(p);
-    if (pi >= 0 && spots[pi] === p.pref && !slots[pi]){ slots[pi] = p; placed.add(p); continue; }
-    const i = spots.findIndex((s, k) => s === p.pref && !slots[k]);
+    if (pi >= 0 && spots[pi] === pref && !slots[pi]){ slots[pi] = p; placed.add(p); continue; }
+    const i = spots.findIndex((s, k) => s === pref && !slots[k]);
     if (i >= 0){ slots[i] = p; placed.add(p); }
   }
   for (const p of onField){           // 2. stay where you were
@@ -483,45 +488,81 @@ function assignSlots(spots, onField, prev){
   return slots;
 }
 
+// who holds which seat at time t. A seat is a player's place in the team as filled in (line,
+// preferred side, rotation order); a live swap during the match makes two players trade seats.
+function holdersAt(t){
+  const m = new Map(S.players.map(p => [p.id, p]));
+  M.swaps.forEach(s => {
+    if (s.t > t || s.pos) return;
+    let sa = null, sb = null;
+    m.forEach((pl, seat) => { if (pl.id === s.a) sa = seat; if (pl.id === s.b) sb = seat; });
+    if (sa && sb){ const pa = m.get(sa); m.set(sa, m.get(sb)); m.set(sb, pa); }
+  });
+  return m;
+}
+function seatOf(pid, t){
+  let seat = null;
+  holdersAt(t).forEach((pl, id) => { if (pl.id === pid) seat = S.players.find(p => p.id === id); });
+  return seat;
+}
+
 function buildPlan(){
   const H = S.halfMin * 60, T = 2 * H;
-  const splits = [...new Set(M.outs.flatMap(o => [o.from, o.to]).filter(x => x != null && x > 0 && x < T))];
-  const groups = S.groups.map((g, gi) => {
+  M.swaps.sort((a, b) => a.t - b.t);
+  const splits = [...M.outs.flatMap(o => [o.from, o.to]), ...M.swaps.map(s => s.t)].filter(x => x != null && x > 0 && x < T);
+  const GS = S.groups.map((g, gi) => {
     const members = S.players.filter(p => p.group === g.id && p.present);
     const Sn = g.spots.length, P = members.length, b = Math.max(0, P - Sn);
     const n = g.blocks === "auto" ? autoBlocks(P, b, S.halfMin) : g.blocks;
     const regular = [];
     for (let i = 0; i < 2 * n; i++) regular.push(Math.floor(i / n) * H + Math.round((i % n) * H / n));
-    const regSet = new Set(regular);
-    const starts = [...new Set([...regular, ...splits])].sort((a, b) => a - b);
-    const order = new Map(members.map((m, i) => [m.id, i]));
-    const played = new Map(members.map(m => [m.id, 0]));
-    const blocks = [];
-    let prev = null, prevField = [];
-    starts.forEach((start, i) => {
-      const end = i + 1 < starts.length ? starts[i + 1] : T;
-      const avail = members.filter(m => isAvail(m.id, start));
-      const need = Math.min(Sn, avail.length);
+    return { g, gi, members, S: Sn, P, b, n, regular, regSet: new Set(regular), blocks: [],
+      order: new Map(members.map((m, i) => [m.id, i])), seatPlayed: new Map(members.map(m => [m.id, 0])), pref: new Map(members.map(m => [m.id, m.pref])), prev: null, prevField: [] };
+  });
+  const starts = [...new Set([...GS.flatMap(G => G.regular), ...splits])].sort((a, b) => a - b);
+  const played = new Map(S.players.map(p => [p.id, 0]));   // real minutes per player
+  starts.forEach((start, i) => {
+    const end = i + 1 < starts.length ? starts[i + 1] : T;
+    const hold = holdersAt(start), who = seat => hold.get(seat.id);
+    // "share the minutes again": from here the rotation looks at what each girl really played
+    if (M.swaps.some(s => s.t === start && s.rebalance)) GS.forEach(G => G.members.forEach(m => G.seatPlayed.set(m.id, played.get(who(m).id))));
+    // two girls in the same line trade sides: only where they stand changes, not when they sit
+    M.swaps.forEach(s => {
+      if (s.t !== start || !s.pos) return;
+      GS.forEach(G => {
+        if (!G.prev) return;
+        const ia = G.prev.findIndex(x => x && who(x).id === s.a), ib = G.prev.findIndex(x => x && who(x).id === s.b);
+        if (ia < 0 || ib < 0) return;
+        G.pref.set(G.prev[ia].id, G.g.spots[ib]); G.pref.set(G.prev[ib].id, G.g.spots[ia]);
+      });
+    });
+    GS.forEach(G => {
+      const sp = G.seatPlayed, order = G.order;
+      const avail = G.members.filter(m => isAvail(who(m).id, start));
+      const need = Math.min(G.S, avail.length);
       let field;
-      if (regSet.has(start) || !prev){
+      if (G.regSet.has(start) || !G.prev){
         // whoever has played most goes to the bench; on a tie the rotation order decides
-        const benchN = avail.length - need;
-        const bench = [...avail].sort((a, c) => played.get(c.id) - played.get(a.id) || order.get(a.id) - order.get(c.id)).slice(0, benchN);
+        const bench = [...avail].sort((a, c) => sp.get(c.id) - sp.get(a.id) || order.get(a.id) - order.get(c.id)).slice(0, avail.length - need);
         field = avail.filter(m => !bench.includes(m));
       } else {
-        // injury or return mid-block: keep who is on, fill gaps with whoever has played least
-        const keep = prevField.filter(m => avail.includes(m));
-        const fresh = avail.filter(m => !keep.includes(m)).sort((a, c) => played.get(a.id) - played.get(c.id) || order.get(a.id) - order.get(c.id));
+        // between two swap moments: keep who is on, fill gaps with whoever has played least
+        const keep = G.prevField.filter(m => avail.includes(m));
+        const fresh = avail.filter(m => !keep.includes(m)).sort((a, c) => sp.get(a.id) - sp.get(c.id) || order.get(a.id) - order.get(c.id));
         field = keep.concat(fresh.slice(0, need - keep.length));
       }
       const bench = avail.filter(m => !field.includes(m));
-      const slots = assignSlots(g.spots, field, prev);
-      field.forEach(m => played.set(m.id, played.get(m.id) + end - start));
-      blocks.push({ start, end, half: start < H ? 0 : 1, bench, slots, regular: regSet.has(start) });
-      prev = slots; prevField = field;
+      const slots = assignSlots(G.g.spots, field, G.prev, m => G.pref.get(m.id));
+      field.forEach(m => { sp.set(m.id, sp.get(m.id) + end - start); played.set(who(m).id, played.get(who(m).id) + end - start); });
+      G.prev = slots; G.prevField = field;
+      const B = { start, end, half: start < H ? 0 : 1, bench: bench.map(who), slots: slots.map(s => s && who(s)) };
+      const last = G.blocks[G.blocks.length - 1];
+      const same = last && last.half === B.half && last.slots.every((p, k) => p === B.slots[k]) &&
+        last.bench.length === B.bench.length && last.bench.every(p => B.bench.includes(p));
+      if (same) last.end = end; else G.blocks.push(B);
     });
-    return { g, gi, members, S: Sn, P, b, n, blocks, played };
   });
+  const groups = GS.map(({ g, gi, members, S: Sn, P, b, n, regular, blocks }) => ({ g, gi, members, S: Sn, P, b, n, regular, blocks }));
   const times = [...new Set(groups.flatMap(G => G.blocks.map(B => B.start)).filter(t => t > 0))].sort((a, b) => a - b);
   const events = times.map(t => {
     const changes = [];
@@ -538,7 +579,7 @@ function buildPlan(){
     }
     return { t, changes };
   }).filter(e => e.changes.length);
-  return { H, T, groups, events };
+  return { H, T, groups, events, played };
 }
 let plan = buildPlan();
 
@@ -721,7 +762,7 @@ let liveKey = "";
 function renderLive(force){
   const st = liveState();
   const blocksKey = plan.groups.map(G => G.blocks.indexOf(blockAt(G, st.lt))).join(",");
-  const key = [st.ph, st.nx ? st.nx.t : -1, st.mode, blocksKey, M.acks.join("."), armed.key === "reset", pick, JSON.stringify(M.outs)].join("|");
+  const key = [st.ph, st.nx ? st.nx.t : -1, st.mode, blocksKey, M.acks.join("."), armed.key === "reset", pick, JSON.stringify(M.outs), JSON.stringify(M.swaps), JSON.stringify(pendingSwap)].join("|");
   if (force || key !== liveKey){
     liveKey = key;
     const [act, label] = mainButton(st.ph);
@@ -765,7 +806,7 @@ function renderLive(force){
     const benchChips = benchPl.map(x => `<button class="bChip${inIds.has(x.p.id) ? " in" : ""}${pick === x.p.id ? " sel" : ""}" data-action="pick" data-drop="1" data-pid="${esc(x.p.id)}">
         ${inIds.has(x.p.id) ? '<span class="tag in">erin</span>' : ""}<b>${esc(x.p.name)}</b><small>${esc(x.G.g.name)}</small>
         ${x.back != null ? `<span class="bWait"><span>erin over</span><strong class="cd" data-at="${x.back}">${cdText(x.back, st.e)}</strong></span>` : `<span class="bWait"><span>blijft op de bank</span></span>`}
-      </button>`).join("") + hurt.map(p => `<button class="bChip inj${pick === p.id ? " sel" : ""}" data-action="pick" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc((S.groups.find(g => g.id === p.group) || {}).name || "")}</small><span class="injTag">Geblesseerd</span></button>`).join("");
+      </button>`).join("") + hurt.map(p => `<button class="bChip inj${pick === p.id ? " sel" : ""}" data-action="pick" data-drop="1" data-nodrag="1" data-pid="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc((S.groups.find(g => g.id === (seatOf(p.id, st.e) || p).group) || {}).name || "")}</small><span class="injTag">Geblesseerd</span></button>`).join("");
     const bench = `<div class="bench">
       <div class="benchHead"><strong>Wissels</strong><span>${benchPl.length ? benchPl.length + " op de bank" : "niemand op de bank"}${hurt.length ? " · " + hurt.length + " geblesseerd" : ""}</span></div>
       ${benchChips ? `<div class="benchRow">${benchChips}</div>` : `<span class="muted">Iedereen staat in het veld.</span>`}
@@ -790,9 +831,9 @@ function renderLive(force){
       </div>
       ${next}
       <h2 class="secTitle">Op het veld <span>${st.ph === "start" ? "opstelling bij de start" : "nu"}</span></h2>
-      <p class="tapHint">${st.ph === "start" ? "Opstelling wijzigen? Hou een speelster of wissel vast en sleep haar naar een andere plek." : "Blessure? Tik op de speelster."}</p>
+      <p class="tapHint">${st.ph === "start" ? "Opstelling wijzigen? Hou een speelster of wissel vast en sleep haar naar een andere plek." : st.ph === "end" ? "" : "Blessure? Tik op de speelster. Ruilen? Hou haar vast en sleep haar naar een andere plek."}</p>
       <div class="pitch"><span class="circ top"></span><span class="circ bot"></span>${bands}</div>
-      ${sheetHTML()}
+      ${pendingSwap ? swapSheetHTML() : sheetHTML()}
       ${bench}
       ${later}
       <div class="resetRow"><button class="btnText${armed.key === "reset" ? " armed" : ""}" data-action="reset">${armed.key === "reset" ? "Tik nog eens om de klok en wissels te wissen" : "Wedstrijd opnieuw beginnen"}</button></div>
@@ -815,9 +856,13 @@ function setOut(pid, injured){
     if (!o) return;
     if (t - o.from < 5) M.outs.splice(M.outs.indexOf(o), 1); else o.to = t;
   }
+  afterLiveChange(t, false);
+}
+// re-plan after a change made during the match. Swaps that were already due count as done and the
+// change at this moment needs no alarm; a drag the coach just did herself is done as well.
+function afterLiveChange(t, doneNow){
   plan = buildPlan();
-  // swaps that were already due count as done; the change at this moment needs no alarm
-  plan.events.forEach(ev => { if (ev.t < t && !M.acks.includes(ev.t)) M.acks.push(ev.t); });
+  plan.events.forEach(ev => { if ((ev.t < t || (doneNow && ev.t === t)) && !M.acks.includes(ev.t)) M.acks.push(ev.t); });
   if (!M.pre.includes(t)) M.pre.push(t);
   if (!M.alarmed.includes(t)) M.alarmed.push(t);
   saveMatch();
@@ -838,10 +883,68 @@ function moveToSpot(pid, gid, spot){
   if (!p || !findG(gid)) return;
   p.group = gid; p.pref = spot;
 }
+// where a player is right now: her seat, her line and whether she is on the pitch
+function whereNow(pid, t){
+  const seat = seatOf(pid, t);
+  const G = seat && plan.groups.find(x => x.g.id === seat.group);
+  const B = G && blockAt(G, t);
+  const idx = B ? B.slots.findIndex(p => p && p.id === pid) : -1;
+  return { seat, G, idx, spot: idx >= 0 ? G.g.spots[idx] : null };
+}
+let pendingSwap = null;   // a move to another line during the match waits for the choice of the coach
+function dropOn(pid, target){
+  const st = liveState(), pre = st.ph === "start", t = pre ? 0 : Math.round(st.e), at = pre ? 0 : st.lt;
+  let other = target.dataset.pid;
+  if (!other){
+    if (pre){ moveToSpot(pid, target.dataset.gid, target.dataset.spot); commit(false); return; }
+    // an open spot during the match belongs to the seat of an injured girl: take that seat
+    const hurtSeat = M.outs.filter(o => o.to == null).map(o => o.pid).find(id => (seatOf(id, t) || {}).group === target.dataset.gid);
+    if (!hurtSeat) return;
+    other = hurtSeat;
+  }
+  if (other === pid) return;
+  const A = whereNow(pid, at), B = whereNow(other, at);
+  if (!A.seat || !B.seat) return;
+  const sameLine = A.seat.group === B.seat.group;
+  if (sameLine && A.idx >= 0 && B.idx >= 0){
+    // both on the pitch in one line: they only trade sides, the bench turns stay as they were
+    if (pre){ const a = findP(pid), b = findP(other); a.pref = B.spot; b.pref = A.spot; commit(false); }
+    else { M.swaps.push({ t, a: pid, b: other, pos: true }); afterLiveChange(t, true); }
+    return;
+  }
+  if (pre){ swapPlayers(pid, other); commit(false); return; }
+  if (sameLine){ M.swaps.push({ t, a: pid, b: other }); afterLiveChange(t, true); return; }
+  const next = [...A.G.regular, ...B.G.regular].filter(x => x > t).sort((x, y) => x - y)[0];
+  pendingSwap = { a: pid, b: other, until: next == null ? null : next };
+  pick = null;
+}
+function applyPendingSwap(mode){
+  const p = pendingSwap; pendingSwap = null;
+  if (!p || mode === "cancel") return;
+  const t = Math.round(elapsed());
+  M.swaps.push({ t, a: p.a, b: p.b, rebalance: mode === "fair" });
+  if (mode === "temp" && p.until != null && p.until > t) M.swaps.push({ t: p.until, a: p.a, b: p.b });
+  afterLiveChange(t, true);
+}
+function swapSheetHTML(){
+  if (!pendingSwap) return "";
+  const a = findP(pendingSwap.a), b = findP(pendingSwap.b);
+  if (!a || !b){ pendingSwap = null; return ""; }
+  const u = pendingSwap.until;
+  return `<div class="sheet" id="sheet" role="group" aria-label="Linie wisselen">
+    <div class="sheetHead"><strong>${esc(a.name)} ↔ ${esc(b.name)}</strong><button class="btnText" data-action="swap-cancel">Annuleren</button></div>
+    <p>Ze ruilen van linie. Wat moet er met het wisselschema gebeuren?</p>
+    <div class="choices">
+      <button class="choice" data-action="swap-keep"><b>Ruilen voor de rest van de wedstrijd</b><span>Ze nemen elkaars wisselbeurten over. Voor de anderen verandert er niets.</span></button>
+      ${u != null ? `<button class="choice" data-action="swap-temp"><b>Alleen tot minuut ${tFmt(u)}</b><span>Bij het volgende wisselmoment gaan ze terug naar hun eigen linie en geldt het oude schema weer.</span></button>` : ""}
+      <button class="choice" data-action="swap-fair"><b>Ruilen en speeltijd opnieuw eerlijk verdelen</b><span>De wissels in beide linies worden opnieuw verdeeld op de minuten die iedereen echt gespeeld heeft.</span></button>
+    </div>
+  </div>`;
+}
 const drag = { pid: null, src: null, sx: 0, sy: 0, timer: null, active: false, ghost: null, over: null, justDropped: false };
-const canDrag = () => phase(elapsed()) === "start";
+const canDrag = () => phase(elapsed()) !== "end";
 function dragDown(el, x, y){
-  if (!canDrag() || !el || !el.dataset.pid) return;
+  if (!canDrag() || !el || !el.dataset.pid || el.dataset.nodrag) return;
   dragReset();
   Object.assign(drag, { pid: el.dataset.pid, src: el, sx: x, sy: y });
   drag.timer = setTimeout(() => dragActivate(x, y), 380);
@@ -892,10 +995,9 @@ function dragUp(){
   drag.justDropped = true;
   setTimeout(() => { drag.justDropped = false; }, 400);
   if (!t) return;
-  if (t.dataset.pid) swapPlayers(pid, t.dataset.pid);
-  else moveToSpot(pid, t.dataset.gid, t.dataset.spot);
-  commit(false);
+  dropOn(pid, t);
   renderLive(true);
+  if (pendingSwap){ const sh = $("#sheet"); if (sh) sh.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
 }
 function dragReset(){
   clearTimeout(drag.timer);
@@ -930,16 +1032,21 @@ liveEl.addEventListener("click", ev => {
   else if (a === "ack"){ const st = liveState(); if (st.nx){ M.acks.push(st.nx.t); saveMatch(); } }
   else if (a === "pick"){
     pick = pick === b.dataset.pid ? null : b.dataset.pid;
+    pendingSwap = null;
     renderLive(true);
     const sh = $("#sheet"); if (sh) sh.scrollIntoView({ block: "nearest", behavior: "smooth" });
     return;
   }
   else if (a === "pick-close") pick = null;
+  else if (a === "swap-keep") applyPendingSwap("keep");
+  else if (a === "swap-temp") applyPendingSwap("temp");
+  else if (a === "swap-fair") applyPendingSwap("fair");
+  else if (a === "swap-cancel") applyPendingSwap("cancel");
   else if (a === "injure"){ setOut(pick, true); pick = null; }
   else if (a === "fit"){ setOut(pick, false); pick = null; }
   else if (a === "new" || a === "reset"){
     if (a === "reset" && !isArmed("reset")){ arm("reset"); renderLive(true); return; }
-    M = freshMatch(); saveMatch(); disarm(); pick = null; plan = buildPlan();
+    M = freshMatch(); saveMatch(); disarm(); pick = null; pendingSwap = null; plan = buildPlan();
   }
   renderLive(true);
 });
@@ -1014,22 +1121,30 @@ function renderPlan(){
     const sum = groupSummary(G);
     rows += `<div class="gGroup"><strong>${esc(G.g.name)}</strong><span>${esc(sum.text)}</span></div>`;
     G.members.forEach(p => {
-      const segs = [];
-      G.blocks.forEach(B => {
+      const raw = [];
+      plan.groups.forEach(X => X.blocks.forEach(B => {
         const idx = B.slots.indexOf(p);
-        const st = idx >= 0 ? "on" : B.bench.includes(p) ? "off" : "inj", spot = idx >= 0 ? G.g.spots[idx] : "";
+        if (idx >= 0) raw.push({ st: "on", spot: X.g.spots[idx], gi: X.gi, start: B.start, end: B.end });
+        else if (B.bench.includes(p)) raw.push({ st: "off", spot: "", gi: X.gi, start: B.start, end: B.end });
+      }));
+      raw.sort((x, y) => x.start - y.start);
+      const segs = [];
+      const add = seg => {
         const last = segs[segs.length - 1];
-        if (last && last.st === st && last.spot === spot && last.end === B.start) last.end = B.end;
-        else segs.push({ st, spot, start: B.start, end: B.end });
-      });
+        if (last && last.st === seg.st && last.spot === seg.spot && last.gi === seg.gi && last.end === seg.start) last.end = seg.end;
+        else segs.push(seg);
+      };
+      let cursor = 0;
+      raw.forEach(seg => { if (seg.start > cursor) add({ st: "inj", spot: "", gi: -1, start: cursor, end: seg.start }); add(seg); cursor = seg.end; });
+      if (cursor < T) add({ st: "inj", spot: "", gi: -1, start: cursor, end: T });
       const html = segs.map(s => {
         const w = (s.end - s.start) / T * 100;
         const text = s.st === "on" ? s.spot : s.st === "inj" ? "blessure" : "";
         const lab = text && w >= 16 ? `<em>${esc(text)}</em>` : "";
-        const cls = s.st === "on" ? "g" + (G.gi % 4) : s.st;
+        const cls = s.st === "on" ? "g" + (s.gi % 4) : s.st;
         return `<span class="seg ${cls}" style="left:${s.start / T * 100}%;width:${w}%">${lab}</span>`;
       }).join("");
-      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i><i class="gPast"></i><i class="gNow"></i></div><div class="gTot">${durFmt(G.played.get(p.id))}</div></div>`;
+      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i><i class="gPast"></i><i class="gNow"></i></div><div class="gTot">${durFmt(plan.played.get(p.id) || 0)}</div></div>`;
     });
   });
   const absent = S.players.filter(p => !p.present).map(p => p.name);
@@ -1297,6 +1412,7 @@ document.querySelector(".tabbar").addEventListener("click", ev => {
 if (!["live", "plan", "team"].includes(UI.tab)) UI.tab = "live";
 if (incoming || importMsg) UI.tab = "team";
 if (!Array.isArray(M.outs)) M.outs = [];
+if (!Array.isArray(M.swaps)) M.swaps = [];
 plan = buildPlan();
 clampRun();
 renderAll();
