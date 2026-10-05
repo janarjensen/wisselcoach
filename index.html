@@ -201,10 +201,10 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .gName{font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gTot{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;font-size:14px}
 .gHead .gTot{font-size:11px;color:var(--muted);font-weight:700}
-.gAxis{position:relative;height:16px;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-.gAxis span{position:absolute;transform:translateX(-50%)}
-.gAxis span:first-child{transform:none}
-.gAxis span:last-child{transform:translateX(-100%)}
+.gAxis{position:relative;height:34px;font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gAxis span{position:absolute;bottom:0;transform:translateX(-50%)}
+.gAxis span:first-of-type{transform:none}
+.gAxis span:last-of-type{transform:translateX(-100%)}
 .gBar{position:relative;height:28px;border-radius:6px;background:var(--surface-2);overflow:hidden}
 .seg{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-right:1px solid var(--surface)}
 .seg em{font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--g-ink);white-space:nowrap;overflow:hidden;padding:0 3px}
@@ -213,6 +213,10 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .seg.inj{background:var(--alert-soft)}
 .seg.inj em{color:var(--alert)}
 .gHalf{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--ink);opacity:.55}
+.gPast{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--surface);opacity:.5;pointer-events:none}
+.gNow{position:absolute;left:0;top:0;bottom:0;width:3px;margin-left:-1.5px;background:var(--alert);pointer-events:none}
+.gNowTag{position:absolute;top:0;left:0;background:var(--alert);color:var(--alert-ink);border-radius:5px;padding:0 5px;font-size:11px;font-weight:800;line-height:15px;white-space:nowrap}
+.legend .lNow{width:3px;height:12px;border-radius:0;background:var(--alert)}
 .gGroup{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:10px;padding-bottom:2px;border-bottom:1px solid var(--line)}
 .gGroup strong{font-family:var(--font-display);font-size:17px}
 .gGroup span{font-size:12.5px;color:var(--muted)}
@@ -306,7 +310,7 @@ body.isDragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 "use strict";
 const KEY = "wisselcoach-mo9-v1";
 // bump on every published change so the coach can tell a cached page from the latest one
-const APP_VERSION = "1 okt, 11:15";
+const APP_VERSION = "5 okt, 10:35";
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad = n => String(n).padStart(2, "0");
@@ -955,6 +959,7 @@ function tick(){
   }
   if (r && !rang) whistle(r);
   if (UI.tab === "live") renderLive(false);
+  if (UI.tab === "plan") updatePlanNow();
 }
 setInterval(tick, 250);
 
@@ -991,6 +996,14 @@ function planText(){
   return L.join("\n");
 }
 
+// the "now" line: runs left to right over every row as the match clock advances
+function updatePlanNow(){
+  const e = elapsed(), pct = e / plan.T * 100;
+  document.querySelectorAll("#tab-plan .gNow").forEach(el => { el.style.left = pct + "%"; });
+  document.querySelectorAll("#tab-plan .gPast").forEach(el => { el.style.width = pct + "%"; });
+  const tag = $("#gNowTag");
+  if (tag){ tag.style.left = pct + "%"; tag.style.transform = `translateX(-${pct}%)`; tag.textContent = clockFmt(e); }
+}
 function renderPlan(){
   const T = plan.T, H = plan.H;
   const ticks = [];
@@ -1016,7 +1029,7 @@ function renderPlan(){
         const cls = s.st === "on" ? "g" + (G.gi % 4) : s.st;
         return `<span class="seg ${cls}" style="left:${s.start / T * 100}%;width:${w}%">${lab}</span>`;
       }).join("");
-      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i></div><div class="gTot">${durFmt(G.played.get(p.id))}</div></div>`;
+      rows += `<div class="gRow"><div class="gName" title="${esc(p.name)}">${esc(p.name)}</div><div class="gBar">${html}<i class="gHalf"></i><i class="gPast"></i><i class="gNow"></i></div><div class="gTot">${durFmt(G.played.get(p.id))}</div></div>`;
     });
   });
   const absent = S.players.filter(p => !p.present).map(p => p.name);
@@ -1035,10 +1048,10 @@ function renderPlan(){
     <p class="lead">Wie wanneer speelt, per linie. De lijn in het midden is de rust. Rechts staat de speeltijd in minuten.</p>
     <div class="card">
       <div class="ganttWrap"><div class="gantt">
-        <div class="gHead"><div></div><div class="gAxis">${ticks.join("")}</div><div class="gTot">min</div></div>
+        <div class="gHead"><div></div><div class="gAxis">${ticks.join("")}<b class="gNowTag" id="gNowTag"></b></div><div class="gTot">min</div></div>
         ${rows}
       </div></div>
-      <div class="legend"><span><i class="lOn"></i>in het veld</span><span><i class="lOff"></i>op de bank</span>${anyInj ? '<span><i class="lInj"></i>geblesseerd</span>' : ""}</div>
+      <div class="legend"><span><i class="lOn"></i>in het veld</span><span><i class="lOff"></i>op de bank</span><span><i class="lNow"></i>nu</span>${anyInj ? '<span><i class="lInj"></i>geblesseerd</span>' : ""}</div>
       ${absent.length ? `<p class="absent">Afwezig: ${esc(absent.join(", "))}</p>` : ""}
     </div>
     <div class="card" id="copyFallback" hidden>
@@ -1046,6 +1059,7 @@ function renderPlan(){
       <textarea class="copyBox" id="copyText" readonly></textarea>
     </div>
     <div class="card"><h2>Wisselmomenten</h2>${evHtml}</div>`;
+  updatePlanNow();
 }
 $("#tab-plan").addEventListener("click", ev => {
   const b = ev.target.closest("[data-action='copy']"); if (!b) return;
